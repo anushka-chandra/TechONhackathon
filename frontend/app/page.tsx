@@ -93,34 +93,55 @@ export default function LandingPage() {
     }, 800)
   }
 
+  // ── Instant local summary (no network needed) ────────────────────
+  function localSummary(text: string): string {
+    const fillers = new Set([
+      'a','an','the','is','are','was','were','be','been',
+      'have','has','had','do','does','will','would','could',
+      'for','with','to','of','in','on','at','by','from',
+      'and','or','but','so','that','this','we','i','my',
+    ])
+    const meaningful = text.split(/\s+/).filter(w => !fillers.has(w.toLowerCase()))
+    return (meaningful.slice(0, 6).join(' ') || text.split(/\s+/).slice(0, 6).join(' '))
+  }
+
   // ── Summarise + persist to sidebar history (fire-and-forget) ─────
   async function summarizeAndStore(text: string, agentIds: string) {
-    // Signal the sidebar immediately so the spinner appears
-    window.dispatchEvent(new Event('nexus_summarize_pending'))
+    const id = Date.now().toString()
+
+    // ① Write an instant local summary immediately — sidebar updates NOW
+    const instantEntry: ChatEntry = {
+      id,
+      summary: localSummary(text),
+      requirements: text,
+      agents: agentIds,
+      timestamp: Date.now(),
+    }
+    const existing: ChatEntry[] = JSON.parse(localStorage.getItem('nexus_chats') || '[]')
+    localStorage.setItem('nexus_chats', JSON.stringify([...existing, instantEntry]))
+    window.dispatchEvent(new Event('nexus_chat_updated'))
+
+    // ② Try to upgrade with a proper summary via the same-origin API route
     try {
-      const res = await fetch('http://localhost:8000/api/summarize', {
+      const res = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      if (!res.ok) throw new Error(`status ${res.status}`)
+      if (!res.ok) return
       const data = await res.json()
-      const entry: ChatEntry = {
-        id: Date.now().toString(),
-        summary: data.summary,
-        requirements: text,
-        agents: agentIds,
-        timestamp: Date.now(),
+      if (data.summary && data.summary !== localSummary(text)) {
+        // Patch the entry we already stored with the better summary
+        const latest: ChatEntry[] = JSON.parse(localStorage.getItem('nexus_chats') || '[]')
+        const idx = latest.findIndex(c => c.id === id)
+        if (idx !== -1) {
+          latest[idx].summary = data.summary
+          localStorage.setItem('nexus_chats', JSON.stringify(latest))
+          window.dispatchEvent(new Event('nexus_chat_updated'))
+        }
       }
-      const existing: ChatEntry[] = JSON.parse(
-        localStorage.getItem('nexus_chats') || '[]'
-      )
-      localStorage.setItem('nexus_chats', JSON.stringify([...existing, entry]))
-      // This event also clears the spinner in the sidebar
-      window.dispatchEvent(new Event('nexus_chat_updated'))
     } catch {
-      // Clear spinner even on failure so the UI isn't stuck
-      window.dispatchEvent(new Event('nexus_chat_updated'))
+      // silent — instant summary is already showing
     }
   }
 
@@ -128,7 +149,7 @@ export default function LandingPage() {
   function goToStep2() {
     if (!requirements.trim()) return
     setStep(2)
-    summarizeAndStore(requirements, '')
+    summarizeAndStore(requirements, '')   // writes to localStorage synchronously then upgrades async
   }
 
   // ── Step 2 → 3 ────────────────────────────────────────────────────
