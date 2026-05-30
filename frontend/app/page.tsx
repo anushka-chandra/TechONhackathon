@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import type { ChatEntry } from '@/components/Sidebar'
+import { useChat } from '@/context/ChatContext'
 
 type Phase = 'intro' | 'expanding' | 'main'
 type Step = 1 | 2 | 3
@@ -75,6 +75,7 @@ const SpinnerIcon = () => (
 
 export default function LandingPage() {
   const router = useRouter()
+  const { addChat, updateChat } = useChat()          // ← React Context, no events needed
   const [phase, setPhase] = useState<Phase>('intro')
   const [step, setStep] = useState<Step>(1)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
@@ -93,7 +94,7 @@ export default function LandingPage() {
     }, 800)
   }
 
-  // ── Instant local summary (no network needed) ────────────────────
+  // ── Instant local summary ─────────────────────────────────────────
   function localSummary(text: string): string {
     const fillers = new Set([
       'a','an','the','is','are','was','were','be','been',
@@ -102,26 +103,19 @@ export default function LandingPage() {
       'and','or','but','so','that','this','we','i','my',
     ])
     const meaningful = text.split(/\s+/).filter(w => !fillers.has(w.toLowerCase()))
-    return (meaningful.slice(0, 6).join(' ') || text.split(/\s+/).slice(0, 6).join(' '))
+    return meaningful.slice(0, 6).join(' ') || text.split(/\s+/).slice(0, 6).join(' ')
   }
 
-  // ── Summarise + persist to sidebar history (fire-and-forget) ─────
+  // ── Summarise via API and upgrade the sidebar entry ───────────────
   async function summarizeAndStore(text: string, agentIds: string) {
-    const id = Date.now().toString()
-
-    // ① Write an instant local summary immediately — sidebar updates NOW
-    const instantEntry: ChatEntry = {
-      id,
+    // ① Add to sidebar immediately with a local smart summary
+    const id = addChat({
       summary: localSummary(text),
       requirements: text,
       agents: agentIds,
-      timestamp: Date.now(),
-    }
-    const existing: ChatEntry[] = JSON.parse(localStorage.getItem('nexus_chats') || '[]')
-    localStorage.setItem('nexus_chats', JSON.stringify([...existing, instantEntry]))
-    window.dispatchEvent(new Event('nexus_chat_updated'))
+    })
 
-    // ② Try to upgrade with a proper summary via the same-origin API route
+    // ② Upgrade in the background with the API summary
     try {
       const res = await fetch('/api/summarize', {
         method: 'POST',
@@ -130,26 +124,15 @@ export default function LandingPage() {
       })
       if (!res.ok) return
       const data = await res.json()
-      if (data.summary && data.summary !== localSummary(text)) {
-        // Patch the entry we already stored with the better summary
-        const latest: ChatEntry[] = JSON.parse(localStorage.getItem('nexus_chats') || '[]')
-        const idx = latest.findIndex(c => c.id === id)
-        if (idx !== -1) {
-          latest[idx].summary = data.summary
-          localStorage.setItem('nexus_chats', JSON.stringify(latest))
-          window.dispatchEvent(new Event('nexus_chat_updated'))
-        }
-      }
-    } catch {
-      // silent — instant summary is already showing
-    }
+      if (data.summary) updateChat(id, { summary: data.summary })
+    } catch { /* silent — local summary already visible */ }
   }
 
   // ── Step 1 → 2 ────────────────────────────────────────────────────
   function goToStep2() {
     if (!requirements.trim()) return
     setStep(2)
-    summarizeAndStore(requirements, '')   // writes to localStorage synchronously then upgrades async
+    summarizeAndStore(requirements, '')
   }
 
   // ── Step 2 → 3 ────────────────────────────────────────────────────
@@ -177,17 +160,6 @@ export default function LandingPage() {
   function handleVendorChoice(choice: 'upload' | 'search') {
     setActionLoading(choice)
     const agentString = Array.from(selectedAgents).join(',')
-    // Patch the most-recent chat entry with the finalised agent list
-    try {
-      const existing: ChatEntry[] = JSON.parse(
-        localStorage.getItem('nexus_chats') || '[]'
-      )
-      if (existing.length > 0) {
-        existing[existing.length - 1].agents = agentString
-        localStorage.setItem('nexus_chats', JSON.stringify(existing))
-        window.dispatchEvent(new Event('nexus_chat_updated'))
-      }
-    } catch { /* silent */ }
 
     setTimeout(() => {
       const params = new URLSearchParams({
