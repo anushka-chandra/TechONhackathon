@@ -1,12 +1,18 @@
 import os
 import requests as http
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+from sqlalchemy.orm import Session as DbSession
 
-from backend.storage.session_store import store as session_store
+from backend.database.engine import engine, get_db
+from backend.database import models as db_models
+from backend.database import crud
+
+# Create all tables on startup (idempotent — safe to run every time)
+db_models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AI Purchasing Society API", version="1.0.0")
 
@@ -301,88 +307,67 @@ def summarize(req: SummarizeRequest):
         return {"summary": _truncate_fallback(req.text), "method": "error_fallback"}
 
 
-# ── Session storage endpoints ──────────────────────────────────────────────────
-# Each endpoint maps to one step in the frontend onboarding flow.
+# ── Session endpoints (SQLite via SQLAlchemy) ──────────────────────────────────
 
 class Step1Body(BaseModel):
     text: str
     summary: Optional[str] = None
 
-
 class Step2Body(BaseModel):
-    agents: List[str]          # e.g. ["ceo", "cfo"]
-
+    agents: List[str]
 
 class Step3Body(BaseModel):
-    method: str                # "upload" | "search"
+    method: str
     vendor_names: Optional[List[str]] = None
 
 
 @app.post("/api/sessions", status_code=201)
-def create_session():
-    """Step 0 — open a new session before any step data is submitted."""
-    session = session_store.create_session()
+def create_session(db: DbSession = Depends(get_db)):
+    session = crud.create_session(db)
     return {"session_id": session.id, "status": session.status}
 
 
 @app.post("/api/sessions/{session_id}/step1")
-def save_step1(session_id: str, body: Step1Body):
-    """Step 1 — store the user's free-text requirement."""
+def save_step1(session_id: str, body: Step1Body, db: DbSession = Depends(get_db)):
     try:
-        session = session_store.save_step1(
-            session_id, text=body.text, summary=body.summary
-        )
+        session = crud.save_step1(db, session_id, text=body.text, summary=body.summary)
     except KeyError:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"session_id": session.id, "status": session.status, "step": 1}
 
 
 @app.post("/api/sessions/{session_id}/step2")
-def save_step2(session_id: str, body: Step2Body):
-    """Step 2 — store the selected AI board agents."""
+def save_step2(session_id: str, body: Step2Body, db: DbSession = Depends(get_db)):
     try:
-        session = session_store.save_step2(session_id, agents=body.agents)
+        session = crud.save_step2(db, session_id, agents=body.agents)
     except KeyError:
         raise HTTPException(status_code=404, detail="Session not found")
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
     return {"session_id": session.id, "status": session.status, "step": 2}
 
 
 @app.post("/api/sessions/{session_id}/step3")
-def save_step3(session_id: str, body: Step3Body):
-    """Step 3 — store the vendor input method and optional vendor names."""
+def save_step3(session_id: str, body: Step3Body, db: DbSession = Depends(get_db)):
     try:
-        session = session_store.save_step3(
-            session_id,
-            method=body.method,
-            vendor_names=body.vendor_names,
-        )
+        session = crud.save_step3(db, session_id, method=body.method, vendor_names=body.vendor_names)
     except KeyError:
         raise HTTPException(status_code=404, detail="Session not found")
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
     return {"session_id": session.id, "status": session.status, "step": 3}
 
 
 @app.get("/api/sessions/{session_id}")
-def get_session(session_id: str):
-    """Retrieve the full state of a session."""
-    session = session_store.get(session_id)
+def get_session(session_id: str, db: DbSession = Depends(get_db)):
+    session = crud.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return session.model_dump()
+    return session.to_dict()
 
 
 @app.get("/api/sessions")
-def list_sessions():
-    """Return the lightweight index of all sessions."""
-    return session_store.list_all()
+def list_sessions(db: DbSession = Depends(get_db)):
+    return crud.list_sessions(db)
 
 
 @app.delete("/api/sessions/{session_id}", status_code=204)
-def delete_session(session_id: str):
-    """Remove a session from disk."""
-    found = session_store.delete(session_id)
-    if not found:
+def delete_session(session_id: str, db: DbSession = Depends(get_db)):
+    if not crud.delete_session(db, session_id):
         raise HTTPException(status_code=404, detail="Session not found")
