@@ -1,0 +1,27 @@
+{
+  "id": "baa20b09-f16d-40da-8f54-90c538c11d50",
+  "status": "complete",
+  "step1": {
+    "text": "CRM for 50 sales reps",
+    "summary": "CRM 50 sales reps",
+    "submitted_at": "2026-05-30T18:56:25.175208"
+  },
+  "step2": {
+    "agents": [
+      "ceo",
+      "cfo"
+    ],
+    "submitted_at": "2026-05-30T18:56:25.175787"
+  },
+  "step3": {
+    "method": "upload",
+    "vendor_names": [
+      "Salesforce",
+      "HubSpot"
+    ],
+    "submitted_at": "2026-05-30T18:56:25.176471"
+  },
+  "created_at": "2026-05-30T18:56:25.172089",
+  "updated_at": "2026-05-30T18:56:25.176476",
+  "completed_at": "2026-05-30T18:56:25.176477"
+}
