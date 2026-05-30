@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
+  Brain, ChevronDown,
 } from 'lucide-react'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -134,9 +135,11 @@ function DebateContent() {
   const [revealed, setRevealed] = useState(0)
   const [typing, setTyping] = useState(false)
   const [done, setDone] = useState(false)
+  const [showReasoning, setShowReasoning] = useState(false)   // collapsed by default once done
   const [showReport, setShowReport] = useState(false)
   const skipRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const decisionRef = useRef<HTMLDivElement>(null)
 
   // Flatten rounds → ordered turn list, tagging the first turn of each round
   const flatTurns = useMemo(() => {
@@ -186,7 +189,7 @@ function DebateContent() {
   useEffect(() => {
     if (!data) return
     skipRef.current = false
-    setRevealed(0); setDone(false); setTyping(false)
+    setRevealed(0); setDone(false); setTyping(false); setShowReasoning(false)
     let cancelled = false
     const total = flatTurns.length
 
@@ -208,9 +211,13 @@ function DebateContent() {
     return () => { cancelled = true }
   }, [data, flatTurns])
 
-  // Auto-scroll as turns appear
+  // Auto-scroll: follow the live debate, then jump to the final decision when done
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    if (done) {
+      decisionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
   }, [revealed, typing, done])
 
   function handleSkip() {
@@ -342,79 +349,9 @@ function DebateContent() {
           </div>
         </div>
 
-        {/* Transcript */}
-        <div className="space-y-4">
-          {flatTurns.slice(0, revealed).map((item, i) => {
-            const t = item.turn
-            const c = colorFor(t.id)
-            return (
-              <div key={i}>
-                {item.firstOfRound && (
-                  <div className="flex items-center gap-3 my-6">
-                    <div className="h-px flex-1" style={{ background: '#21262d' }} />
-                    <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full"
-                      style={{ color: PHASE_COLOR[item.phase], background: `${PHASE_COLOR[item.phase]}1a` }}>
-                      {item.roundLabel}
-                    </span>
-                    <div className="h-px flex-1" style={{ background: '#21262d' }} />
-                  </div>
-                )}
-                <div className="turn-in flex gap-3">
-                  <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-lg"
-                    style={{ background: `${c}22`, border: `1px solid ${c}55` }}>
-                    {t.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="font-bold text-sm" style={{ color: '#e6edf3' }}>{t.name}</span>
-                      <span className="text-xs" style={{ color: '#8b949e' }}>{t.role}</span>
-                      {t.phase === 'closing' && t.vote && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
-                          style={{
-                            background: t.vote === 'YES' ? '#1f4a2a' : '#4a1f1f',
-                            color: t.vote === 'YES' ? '#3fb950' : '#f85149',
-                          }}>
-                          {t.vote === 'YES' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          {t.vote}{t.confidence != null && ` · ${t.confidence}%`}
-                        </span>
-                      )}
-                    </div>
-                    <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed"
-                      style={{ background: '#161b22', border: '1px solid #21262d', color: '#c9d1d9' }}>
-                      {t.message}
-                      {t.preferred_vendor && (
-                        <span className="block mt-1.5 text-xs font-semibold" style={{ color: c }}>
-                          → favors {t.preferred_vendor}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-
-          {/* Typing indicator for the next speaker */}
-          {typing && revealed < flatTurns.length && (
-            <div className="flex gap-3 turn-in">
-              <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-lg"
-                style={{
-                  background: `${colorFor(flatTurns[revealed].turn.id)}22`,
-                  border: `1px solid ${colorFor(flatTurns[revealed].turn.id)}55`,
-                }}>
-                {flatTurns[revealed].turn.icon}
-              </div>
-              <div className="rounded-2xl rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5"
-                style={{ background: '#161b22', border: '1px solid #21262d' }}>
-                <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Decision panel */}
+        {/* ── Final decision — surfaced on top once the board concludes ── */}
         {done && dec && (
-          <div className="turn-in mt-12 space-y-6">
+          <div ref={decisionRef} className="turn-in space-y-6 mb-8">
             {/* Winner banner */}
             <div className="rounded-2xl border p-8 text-center"
               style={{
@@ -482,6 +419,121 @@ function DebateContent() {
             </div>
           </div>
         )}
+
+        {/* ── Full debate & reasoning ── live while generating, collapsible after ── */}
+        <section>
+          {/* Toggle appears only once the debate is over */}
+          {done && (
+            <button
+              onClick={() => setShowReasoning(v => !v)}
+              aria-expanded={showReasoning}
+              className="w-full flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors"
+              style={{ background: '#161b22', borderColor: '#30363d' }}
+              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = '#3d444d')}
+              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = '#30363d')}
+            >
+              <Brain className="w-4 h-4 shrink-0" style={{ color: '#a371f7' }} />
+              <span className="text-sm font-semibold" style={{ color: '#e6edf3' }}>
+                {showReasoning ? 'Hide' : 'Show'} the board&rsquo;s full debate
+              </span>
+              <span className="hidden sm:inline text-xs" style={{ color: '#8b949e' }}>
+                {data?.agents.length ?? 0} agents · {flatTurns.length} statements · 3 rounds
+              </span>
+              <ChevronDown className="w-4 h-4 ml-auto shrink-0"
+                style={{
+                  color: '#8b949e',
+                  transition: 'transform .25s ease',
+                  transform: showReasoning ? 'rotate(180deg)' : 'rotate(0deg)',
+                }} />
+            </button>
+          )}
+
+          {/* Transcript: always shown while generating; on demand after */}
+          {(!done || showReasoning) && (
+            <div className="space-y-4" style={{ marginTop: done ? 16 : 0 }}>
+              {!done && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping"
+                      style={{ background: '#a371f7' }} />
+                    <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#a371f7' }} />
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#a371f7' }}>
+                    Live debate in progress
+                  </span>
+                </div>
+              )}
+
+              {flatTurns.slice(0, revealed).map((item, i) => {
+                const t = item.turn
+                const c = colorFor(t.id)
+                return (
+                  <div key={i}>
+                    {item.firstOfRound && (
+                      <div className="flex items-center gap-3 my-6">
+                        <div className="h-px flex-1" style={{ background: '#21262d' }} />
+                        <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full"
+                          style={{ color: PHASE_COLOR[item.phase], background: `${PHASE_COLOR[item.phase]}1a` }}>
+                          {item.roundLabel}
+                        </span>
+                        <div className="h-px flex-1" style={{ background: '#21262d' }} />
+                      </div>
+                    )}
+                    <div className="turn-in flex gap-3">
+                      <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-lg"
+                        style={{ background: `${c}22`, border: `1px solid ${c}55` }}>
+                        {t.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="font-bold text-sm" style={{ color: '#e6edf3' }}>{t.name}</span>
+                          <span className="text-xs" style={{ color: '#8b949e' }}>{t.role}</span>
+                          {t.phase === 'closing' && t.vote && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                              style={{
+                                background: t.vote === 'YES' ? '#1f4a2a' : '#4a1f1f',
+                                color: t.vote === 'YES' ? '#3fb950' : '#f85149',
+                              }}>
+                              {t.vote === 'YES' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                              {t.vote}{t.confidence != null && ` · ${t.confidence}%`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed"
+                          style={{ background: '#161b22', border: '1px solid #21262d', color: '#c9d1d9' }}>
+                          {t.message}
+                          {t.preferred_vendor && (
+                            <span className="block mt-1.5 text-xs font-semibold" style={{ color: c }}>
+                              → favors {t.preferred_vendor}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Typing indicator for the next speaker */}
+              {typing && revealed < flatTurns.length && (
+                <div className="flex gap-3 turn-in">
+                  <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-lg"
+                    style={{
+                      background: `${colorFor(flatTurns[revealed].turn.id)}22`,
+                      border: `1px solid ${colorFor(flatTurns[revealed].turn.id)}55`,
+                    }}>
+                    {flatTurns[revealed].turn.icon}
+                  </div>
+                  <div className="rounded-2xl rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5"
+                    style={{ background: '#161b22', border: '1px solid #21262d' }}>
+                    <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
         <div ref={bottomRef} />
       </div>
 
