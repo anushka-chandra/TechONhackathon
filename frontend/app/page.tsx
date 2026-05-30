@@ -75,13 +75,14 @@ const SpinnerIcon = () => (
 
 export default function LandingPage() {
   const router = useRouter()
-  const { addChat, updateChat } = useChat()          // ← React Context, no events needed
+  const { addChat, updateChat } = useChat()
   const [phase, setPhase] = useState<Phase>('intro')
   const [step, setStep] = useState<Step>(1)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [selectedAgents, setSelectedAgents] = useState<Set<AgentId>>(new Set())
   const [requirements, setRequirements] = useState('')
   const [actionLoading, setActionLoading] = useState<'upload' | 'search' | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // ── Intro ──────────────────────────────────────────────────────────
@@ -106,26 +107,43 @@ export default function LandingPage() {
     return meaningful.slice(0, 6).join(' ') || text.split(/\s+/).slice(0, 6).join(' ')
   }
 
-  // ── Summarise via API and upgrade the sidebar entry ───────────────
+  // ── Summarise + save to backend (fire-and-forget) ────────────────
   async function summarizeAndStore(text: string, agentIds: string) {
-    // ① Add to sidebar immediately with a local smart summary
-    const id = addChat({
+    // ① Sidebar gets an instant smart-truncation entry right now
+    const chatId = addChat({
       summary: localSummary(text),
       requirements: text,
       agents: agentIds,
     })
 
-    // ② Upgrade in the background with the API summary
+    // ② Create backend session & save step 1 (logs to FastAPI so we can verify)
+    try {
+      const sessionRes = await fetch('http://localhost:8000/api/sessions', {
+        method: 'POST',
+      })
+      if (sessionRes.ok) {
+        const { session_id } = await sessionRes.json()
+        setSessionId(session_id)
+        await fetch(`http://localhost:8000/api/sessions/${session_id}/step1`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, summary: localSummary(text) }),
+        })
+      }
+    } catch { /* backend unreachable — sidebar entry already visible */ }
+
+    // ③ Upgrade sidebar entry with smarter summary from /api/summarize
     try {
       const res = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      if (!res.ok) return
-      const data = await res.json()
-      if (data.summary) updateChat(id, { summary: data.summary })
-    } catch { /* silent — local summary already visible */ }
+      if (res.ok) {
+        const data = await res.json()
+        if (data.summary) updateChat(chatId, { summary: data.summary })
+      }
+    } catch { /* local summary already showing */ }
   }
 
   // ── Step 1 → 2 ────────────────────────────────────────────────────
@@ -139,6 +157,14 @@ export default function LandingPage() {
   function goToStep3() {
     setIsPanelOpen(false)
     setTimeout(() => setStep(3), 200)
+    // Save step 2 to backend
+    if (sessionId) {
+      fetch(`http://localhost:8000/api/sessions/${sessionId}/step2`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agents: Array.from(selectedAgents) }),
+      }).catch(() => {})
+    }
   }
 
   // ── Agent toggle ──────────────────────────────────────────────────
@@ -160,18 +186,22 @@ export default function LandingPage() {
   function handleVendorChoice(choice: 'upload' | 'search') {
     setActionLoading(choice)
     const agentString = Array.from(selectedAgents).join(',')
-
+    // Save step 3 to backend
+    if (sessionId) {
+      fetch(`http://localhost:8000/api/sessions/${sessionId}/step3`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method: choice }),
+      }).catch(() => {})
+    }
     setTimeout(() => {
-      const params = new URLSearchParams({
-        requirements,
-        agents: agentString,
-      })
+      const params = new URLSearchParams({ requirements, agents: agentString })
       router.push(`/dashboard?${params.toString()}`)
     }, 1800)
   }
 
-  // ── Keyboard ──────────────────────────────────────────────────────
-  function handleKeyPress(e: React.KeyboardEvent<HTMLInputElement>) {
+  // ── Keyboard (onKeyDown — onKeyPress removed in React 19) ────────
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && requirements.trim()) goToStep2()
   }
 
@@ -373,7 +403,7 @@ export default function LandingPage() {
               type="text"
               value={requirements}
               onChange={e => setRequirements(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               placeholder="Type your requirements here..."
               className="flex-1 bg-transparent border-none outline-none font-light px-4 py-1.5"
               style={{ color: '#ffffff' }}

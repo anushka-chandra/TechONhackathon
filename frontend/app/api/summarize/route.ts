@@ -18,6 +18,7 @@ function smartTruncate(text: string): string {
 
 export async function POST(req: NextRequest) {
   const { text } = await req.json()
+  console.log('[summarize] received:', JSON.stringify(text).slice(0, 80))
 
   if (!text?.trim()) {
     return NextResponse.json({ summary: 'Untitled session', method: 'empty' })
