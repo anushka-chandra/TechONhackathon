@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import type { ChatEntry } from '@/components/Sidebar'
 
 type Phase = 'intro' | 'expanding' | 'main'
 type Step = 1 | 2 | 3
@@ -92,10 +93,39 @@ export default function LandingPage() {
     }, 800)
   }
 
+  // ── Summarise + persist to sidebar history (fire-and-forget) ─────
+  async function summarizeAndStore(text: string, agentIds: string) {
+    try {
+      const res = await fetch('http://localhost:8000/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const entry: ChatEntry = {
+        id: Date.now().toString(),
+        summary: data.summary,
+        requirements: text,
+        agents: agentIds,
+        timestamp: Date.now(),
+      }
+      const existing: ChatEntry[] = JSON.parse(
+        localStorage.getItem('nexus_chats') || '[]'
+      )
+      localStorage.setItem('nexus_chats', JSON.stringify([...existing, entry]))
+      window.dispatchEvent(new Event('nexus_chat_updated'))
+    } catch {
+      // silent — never block the UI flow
+    }
+  }
+
   // ── Step 1 → 2 ────────────────────────────────────────────────────
   function goToStep2() {
     if (!requirements.trim()) return
     setStep(2)
+    // Kick off summarisation immediately; sidebar updates whenever it resolves
+    summarizeAndStore(requirements, '')
   }
 
   // ── Step 2 → 3 ────────────────────────────────────────────────────
@@ -122,10 +152,23 @@ export default function LandingPage() {
   // ── Step 3 choices ────────────────────────────────────────────────
   function handleVendorChoice(choice: 'upload' | 'search') {
     setActionLoading(choice)
+    const agentString = Array.from(selectedAgents).join(',')
+    // Patch the most-recent chat entry with the finalised agent list
+    try {
+      const existing: ChatEntry[] = JSON.parse(
+        localStorage.getItem('nexus_chats') || '[]'
+      )
+      if (existing.length > 0) {
+        existing[existing.length - 1].agents = agentString
+        localStorage.setItem('nexus_chats', JSON.stringify(existing))
+        window.dispatchEvent(new Event('nexus_chat_updated'))
+      }
+    } catch { /* silent */ }
+
     setTimeout(() => {
       const params = new URLSearchParams({
         requirements,
-        agents: Array.from(selectedAgents).join(','),
+        agents: agentString,
       })
       router.push(`/dashboard?${params.toString()}`)
     }, 1800)

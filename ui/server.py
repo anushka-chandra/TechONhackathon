@@ -1,3 +1,6 @@
+import os
+import requests as http
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -237,3 +240,60 @@ def simulate(req: SimulateRequest):
             f"Re-open vendor comparison if {vendor_a} adoption falls below 80% at the 9-month review."
         ),
     }
+
+
+# ── Summarise endpoint ─────────────────────────────────────────────────────────
+
+class SummarizeRequest(BaseModel):
+    text: str
+
+
+def _truncate_fallback(text: str) -> str:
+    words = text.split()
+    return " ".join(words[:7]) + ("…" if len(words) > 7 else "")
+
+
+@app.post("/api/summarize")
+def summarize(req: SummarizeRequest):
+    hf_token = os.getenv("HF_TOKEN", "")
+
+    if not hf_token:
+        return {"summary": _truncate_fallback(req.text), "method": "truncation"}
+
+    prompt = (
+        "Summarise the following procurement requirement in 6 words or fewer. "
+        "Return only the summary, no explanation.\n\n"
+        f"Requirement: {req.text}\n\nSummary:"
+    )
+
+    try:
+        response = http.post(
+            "https://api-inference.huggingface.co/models/unsloth/Qwen3-27B-GGUF",
+            headers={
+                "Authorization": f"Bearer {hf_token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "inputs": prompt,
+                "parameters": {
+                    "max_new_tokens": 24,
+                    "return_full_text": False,
+                    "temperature": 0.2,
+                },
+            },
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, list) and data:
+                raw = data[0].get("generated_text", "").strip()
+                # Take only the first line and cap at 60 chars
+                summary = raw.splitlines()[0][:60].strip()
+                return {"summary": summary or _truncate_fallback(req.text), "method": "hf_api"}
+
+        # Non-200 → graceful fallback
+        return {"summary": _truncate_fallback(req.text), "method": "truncation_fallback"}
+
+    except Exception:
+        return {"summary": _truncate_fallback(req.text), "method": "error_fallback"}
