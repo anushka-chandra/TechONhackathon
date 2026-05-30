@@ -84,6 +84,7 @@ export default function LandingPage() {
   const [actionLoading, setActionLoading] = useState<'upload' | 'search' | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Intro ──────────────────────────────────────────────────────────
   function handleBubbleClick() {
@@ -107,11 +108,34 @@ export default function LandingPage() {
     return meaningful.slice(0, 6).join(' ') || text.split(/\s+/).slice(0, 6).join(' ')
   }
 
+  // ── Break the requirement into key bullet points for the sidebar ──
+  function localBullets(text: string): string[] {
+    const parts = text
+      .split(/[.;\n]+|,(?=\s)/)            // split on sentences, semicolons, commas
+      .map(s => s.trim())
+      .filter(s => s.split(/\s+/).length >= 2)   // drop fragments of <2 words
+    const seen = new Set<string>()
+    const bullets: string[] = []
+    for (const p of parts) {
+      const cap = p.charAt(0).toUpperCase() + p.slice(1)
+      const short = cap.length > 64 ? cap.slice(0, 61).trimEnd() + '…' : cap
+      const key = short.toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        bullets.push(short)
+      }
+      if (bullets.length >= 4) break
+    }
+    // Always surface at least one bullet so the section never renders empty
+    return bullets.length ? bullets : [text.trim().slice(0, 64)]
+  }
+
   // ── Summarise + save to backend (fire-and-forget) ────────────────
   async function summarizeAndStore(text: string, agentIds: string) {
-    // ① Sidebar gets an instant smart-truncation entry right now
+    // ① Sidebar gets an instant smart-truncation entry + bullet points right now
     const chatId = addChat({
       summary: localSummary(text),
+      bullets: localBullets(text),
       requirements: text,
       agents: agentIds,
     })
@@ -124,6 +148,7 @@ export default function LandingPage() {
       if (sessionRes.ok) {
         const { session_id } = await sessionRes.json()
         setSessionId(session_id)
+        updateChat(chatId, { sessionId: session_id })   // link entry → backend session
         await fetch(`http://localhost:8000/api/sessions/${session_id}/step1`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -182,11 +207,17 @@ export default function LandingPage() {
     )
   }
 
-  // ── Step 3 choices ────────────────────────────────────────────────
+  // ── Step 3: navigate to the live debate, carrying session_id along ──
+  function goToDashboard() {
+    const agentString = Array.from(selectedAgents).join(',')
+    const params = new URLSearchParams({ requirements, agents: agentString })
+    if (sessionId) params.set('session_id', sessionId)
+    router.push(`/debate?${params.toString()}`)
+  }
+
+  // ── Step 3: AI web search (no file) ───────────────────────────────
   function handleVendorChoice(choice: 'upload' | 'search') {
     setActionLoading(choice)
-    const agentString = Array.from(selectedAgents).join(',')
-    // Save step 3 to backend
     if (sessionId) {
       fetch(`http://localhost:8000/api/sessions/${sessionId}/step3`, {
         method: 'POST',
@@ -194,10 +225,34 @@ export default function LandingPage() {
         body: JSON.stringify({ method: choice }),
       }).catch(() => {})
     }
-    setTimeout(() => {
-      const params = new URLSearchParams({ requirements, agents: agentString })
-      router.push(`/dashboard?${params.toString()}`)
-    }, 1800)
+    setTimeout(goToDashboard, 1800)
+  }
+
+  // ── Step 3: file upload → POST the PDF(s), extract text, then simulate ─
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    setActionLoading('upload')
+
+    if (sessionId) {
+      try {
+        // Record the chosen method
+        await fetch(`http://localhost:8000/api/sessions/${sessionId}/step3`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ method: 'upload' }),
+        })
+        // Upload every selected file in one request — backend extracts & combines text
+        const fd = new FormData()
+        Array.from(files).forEach(f => fd.append('files', f))
+        await fetch(`http://localhost:8000/api/upload/${sessionId}`, {
+          method: 'POST',
+          body: fd,   // NOTE: no Content-Type header — browser sets the multipart boundary
+        })
+      } catch { /* backend unreachable — proceed with simulation regardless */ }
+    }
+
+    goToDashboard()
   }
 
   // ── Keyboard (onKeyDown — onKeyPress removed in React 19) ────────
@@ -329,11 +384,21 @@ export default function LandingPage() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            {/* Hidden native file picker driven by the Upload card */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.txt,.csv,.md"
+              multiple
+              className="hidden"
+              onChange={handleFileSelected}
+            />
+
             {/* Upload */}
             <button
               className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4"
               style={{ border: '1px solid rgba(107,114,128,.5)' }}
-              onClick={() => handleVendorChoice('upload')}
+              onClick={() => fileInputRef.current?.click()}
               disabled={actionLoading !== null}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
@@ -351,7 +416,7 @@ export default function LandingPage() {
                 <h3 className="text-xl font-medium text-white mb-2">
                   {actionLoading === 'upload' ? 'Initializing...' : 'Upload Files'}
                 </h3>
-                <p className="text-sm" style={{ color: '#9ca3af' }}>PDFs, spreadsheets, or text documents.</p>
+                <p className="text-sm" style={{ color: '#9ca3af' }}>Select one or more PDFs, spreadsheets, or text files.</p>
               </div>
             </button>
 

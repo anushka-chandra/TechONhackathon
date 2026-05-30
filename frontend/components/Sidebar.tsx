@@ -63,9 +63,21 @@ function ChatItem({ entry, onOpen, onDelete }: {
       onClick={onOpen}
     >
       <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#6b7280' }} />
-      <span className="text-sm truncate flex-1 leading-snug" style={{ color: '#c9d1d9' }}>
-        {entry.summary}
-      </span>
+      <div className="flex-1 min-w-0">
+        <span className="text-sm block truncate leading-snug font-medium" style={{ color: '#c9d1d9' }}>
+          {entry.summary}
+        </span>
+        {entry.bullets && entry.bullets.length > 0 && (
+          <ul className="mt-1.5 space-y-1">
+            {entry.bullets.map((b, i) => (
+              <li key={i} className="flex gap-1.5 text-xs leading-snug" style={{ color: '#8b949e' }}>
+                <span className="shrink-0" style={{ color: '#58a6ff' }}>•</span>
+                <span className="flex-1 break-words">{b}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {hovered && (
         <button
           title="Delete"
@@ -96,7 +108,8 @@ export default function Sidebar() {
       requirements: entry.requirements,
       agents: entry.agents,
     })
-    router.push(`/dashboard?${params.toString()}`)
+    if (entry.sessionId) params.set('session_id', entry.sessionId)
+    router.push(`/debate?${params.toString()}`)
   }
 
   return (

@@ -14,6 +14,7 @@ from backend.database import models as db_models
 from backend.database import crud
 from backend.pdf_extractor import extract_text
 from multi_agent_system.orchestrator import run_society
+from multi_agent_system.debate import run_debate
 
 # ── Create / migrate DB on startup ────────────────────────────────────────────
 db_models.Base.metadata.create_all(bind=engine)
@@ -85,61 +86,102 @@ def simulate(req: SimulateRequest, db: DbSession = Depends(get_db)):
     return result
 
 
+@app.post("/api/debate")
+def debate(req: SimulateRequest, db: DbSession = Depends(get_db)):
+    """
+    Run the multi-round boardroom DEBATE (Opening → Rebuttal → Closing) and
+    return the full transcript plus the moderator's synthesised decision.
+    Same inputs as /api/simulate — pulls vendor_text from the session's PDF.
+    """
+    vendor_text = ""
+    if req.session_id:
+        session = crud.get_session(db, req.session_id)
+        if session and session.step3 and session.step3.vendor_text:
+            vendor_text = session.step3.vendor_text
+
+    brief = (
+        f"Category: {req.target}\n"
+        f"Number of users: {req.users}\n"
+        f"Annual budget: €{req.budget:,.0f}\n"
+        f"Vendors under consideration: {', '.join(req.vendors)}"
+    )
+
+    return run_debate(
+        requirements=brief,
+        vendor_info=vendor_text,
+        selected_agents=req.selected_agents,
+        vendors=req.vendors,
+    )
+
+
 # ── File upload endpoint ───────────────────────────────────────────────────────
 
+# How much combined vendor text we keep per session (agents truncate further)
+MAX_VENDOR_TEXT = 40_000
+
+
 @app.post("/api/upload/{session_id}")
-async def upload_vendor_file(
+async def upload_vendor_files(
     session_id: str,
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     db: DbSession = Depends(get_db),
 ):
     """
-    Accept a PDF (or plain-text) file for a session's Step 3.
-    Extracts text, saves the file to disk, stores the text in the DB.
+    Accept one OR MANY PDF / plain-text files for a session's Step 3.
+    Extracts text from each, saves every file to disk, and appends the
+    combined text to the session so the agents see all documents together.
     """
     session = crud.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    raw = await file.read()
+    extracted_parts: List[str] = []
+    saved_names: List[str] = []
 
-    # Extract text depending on file type
-    filename = (file.filename or "upload").lower()
-    if filename.endswith(".pdf"):
-        vendor_text = extract_text(raw)
-    else:
-        # Plain text / CSV / markdown
+    for f in files:
+        raw = await f.read()
+        filename = f.filename or "upload"
+
+        if filename.lower().endswith(".pdf"):
+            text = extract_text(raw)
+        else:
+            # Plain text / CSV / markdown
+            try:
+                text = raw.decode("utf-8", errors="ignore")[:12_000]
+            except Exception:
+                text = ""
+
+        # Save each file to disk (prefix with session id to avoid collisions)
+        (UPLOAD_DIR / f"{session_id}_{filename}").write_bytes(raw)
+        saved_names.append(filename)
+
+        if text.strip():
+            extracted_parts.append(f"=== Document: {filename} ===\n{text}")
+
+    combined = "\n\n".join(extracted_parts)
+
+    # Ensure a step3 row exists, then APPEND so multiple upload calls accumulate
+    if not session.step3:
         try:
-            vendor_text = raw.decode("utf-8", errors="ignore")[:12_000]
-        except Exception:
-            vendor_text = ""
-
-    # Save file to disk
-    safe_name = f"{session_id}_{file.filename or 'upload'}"
-    dest = UPLOAD_DIR / safe_name
-    dest.write_bytes(raw)
-
-    # Persist extracted text to the database
-    if session.step3:
-        session.step3.vendor_text = vendor_text
-        db.commit()
-    else:
-        # Create a stub step3 row so the text is stored even before the user
-        # makes their vendor-method choice in the UI
-        try:
-            session = crud.save_step3(
-                db, session_id, method="upload", vendor_names=[]
-            )
-            session.step3.vendor_text = vendor_text
-            db.commit()
+            session = crud.save_step3(db, session_id, method="upload", vendor_names=[])
         except Exception:
             pass
 
+    if session.step3:
+        existing = session.step3.vendor_text or ""
+        merged = f"{existing}\n\n{combined}".strip() if existing else combined
+        session.step3.vendor_text = merged[:MAX_VENDOR_TEXT]
+        db.commit()
+        total_chars = len(session.step3.vendor_text)
+    else:
+        total_chars = len(combined)
+
     return {
-        "session_id":   session_id,
-        "filename":     file.filename,
-        "chars_extracted": len(vendor_text),
-        "preview":      vendor_text[:300] + ("…" if len(vendor_text) > 300 else ""),
+        "session_id":      session_id,
+        "files":           saved_names,
+        "count":           len(saved_names),
+        "chars_extracted": total_chars,
+        "preview":         combined[:300] + ("…" if len(combined) > 300 else ""),
     }
 
 

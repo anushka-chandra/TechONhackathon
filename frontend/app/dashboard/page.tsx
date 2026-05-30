@@ -184,6 +184,7 @@ function DashboardContent() {
   // Seed state from landing-page URL params (requirements + agents)
   const paramRequirements = searchParams.get('requirements') ?? ''
   const paramAgents = searchParams.get('agents') ?? ''           // e.g. "ceo,cfo"
+  const paramSessionId = searchParams.get('session_id') ?? ''    // links uploaded PDF
   const fromLanding = Boolean(paramRequirements || paramAgents)
 
   const [target, setTarget] = useState(
@@ -215,6 +216,10 @@ function DashboardContent() {
       // Only send selected_agents when they came from the landing page flow
       if (selectedAgents.length > 0) {
         body.selected_agents = selectedAgents
+      }
+      // Attach the session so the backend feeds the uploaded PDF text to the agents
+      if (paramSessionId) {
+        body.session_id = paramSessionId
       }
       const res = await fetch('http://localhost:8000/api/simulate', {
         method: 'POST',

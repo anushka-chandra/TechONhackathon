@@ -15,6 +15,8 @@ export interface ChatEntry {
   requirements: string
   agents: string
   timestamp: number
+  bullets?: string[]      // key-point breakdown shown in the sidebar
+  sessionId?: string      // backend session id (links uploaded PDF → simulation)
 }
 
 interface ChatContextValue {

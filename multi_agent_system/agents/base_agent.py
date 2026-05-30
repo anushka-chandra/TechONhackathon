@@ -21,7 +21,7 @@ def _client() -> OpenAI:
     )
 
 
-_MODEL = os.getenv("AGENT_MODEL", "anthropic/claude-3-haiku")
+_MODEL = os.getenv("AGENT_MODEL", "google/gemini-2.5-flash")
 
 _RESPONSE_SCHEMA = """\
 Respond with a single JSON object — no markdown, no explanation outside it:
@@ -33,6 +33,38 @@ Respond with a single JSON object — no markdown, no explanation outside it:
   "reasoning":        "<2-3 sentences from your expert perspective>",
   "key_concerns":     ["<concern 1>", "<concern 2>"]
 }"""
+
+
+# ── Debate-mode prompts ─────────────────────────────────────────────────────────
+
+_DEBATE_SYSTEM_SUFFIX = (
+    "\n\nYou are now taking part in a LIVE BOARDROOM DEBATE about this purchasing "
+    "decision with other executives. Stay fully in character. Be concise, pointed, "
+    "and conversational — speak in the first person as if seated around a table. "
+    "When you disagree with another member, address them by name and say exactly why."
+)
+
+_DEBATE_SCHEMA_ARG = """Respond with a single JSON object — no markdown:
+{
+  "message": "<your spoken argument: 2-4 sentences, first person, debate tone>",
+  "preferred_vendor": "<the vendor you currently favor, exact name from the list>"
+}"""
+
+_DEBATE_SCHEMA_CLOSE = """Respond with a single JSON object — no markdown:
+{
+  "message": "<your final closing statement: 2-3 sentences>",
+  "preferred_vendor": "<your final pick, exact name from the list>",
+  "vote": "YES" or "NO",
+  "confidence": <integer 0-100>
+}"""
+
+
+def _format_transcript(transcript: list) -> str:
+    """Render the debate-so-far for the next speaker's context (cap recent turns)."""
+    if not transcript:
+        return "(no statements yet — you may be the first to speak)"
+    recent = transcript[-24:]
+    return "\n".join(f"- {t['name']}: {t['message']}" for t in recent)
 
 
 class BaseAgent:
@@ -126,3 +158,112 @@ class BaseAgent:
             "key_concerns":     ["API unavailable — manual review recommended"],
             "voted_for":        "",
         }
+
+    # ── Debate mode ─────────────────────────────────────────────────────────────
+
+    def speak(
+        self,
+        requirements: str,
+        vendor_info: str,
+        transcript: list,
+        phase: str,
+        vendors: list,
+    ) -> dict:
+        """
+        Produce one debate turn for the given phase ('opening' | 'rebuttal' | 'closing').
+        The agent sees the transcript so far and argues in character.
+        """
+        try:
+            return self._debate_call(requirements, vendor_info, transcript, phase, vendors)
+        except (APIError, Exception):
+            return self._debate_fallback(phase, vendors)
+
+    def _persona(self) -> str:
+        """The agent's character prompt without the evaluation JSON schema."""
+        return self.SYSTEM_PROMPT.replace(_RESPONSE_SCHEMA, "").rstrip()
+
+    def _debate_call(
+        self, requirements: str, vendor_info: str, transcript: list, phase: str, vendors: list
+    ) -> dict:
+        is_close = phase == "closing"
+        schema = _DEBATE_SCHEMA_CLOSE if is_close else _DEBATE_SCHEMA_ARG
+        system = self._persona() + _DEBATE_SYSTEM_SUFFIX + "\n\n" + schema
+
+        vendor_block = (
+            f"\n\nVENDOR INFORMATION (from uploaded documents):\n{vendor_info[:4000]}"
+            if vendor_info.strip()
+            else ""
+        )
+        instructions = {
+            "opening":  "Give your OPENING statement. State which vendor you favor and the single "
+                        "strongest reason from your professional lens.",
+            "rebuttal": "It is the REBUTTAL round. Read the statements above. Directly challenge at "
+                        "least one other board member by name where you disagree, then defend your "
+                        "own position.",
+            "closing":  "Give your CLOSING statement and your final vote.",
+        }[phase]
+
+        user = (
+            f"PROCUREMENT BRIEF:\n{requirements}"
+            + vendor_block
+            + f"\n\nVENDORS ON THE TABLE: {', '.join(vendors)}"
+            + f"\n\nDEBATE SO FAR:\n{_format_transcript(transcript)}"
+            + f"\n\nYOUR TASK: {instructions}"
+        )
+
+        resp = self._client.chat.completions.create(
+            model=_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=320,
+            temperature=0.6,
+        )
+        raw = json.loads(resp.choices[0].message.content)
+        return self._normalise_turn(raw, phase)
+
+    def _normalise_turn(self, raw: dict, phase: str) -> dict:
+        turn = {
+            "id":               self.agent_id,
+            "name":             self.name,
+            "icon":             self.icon,
+            "role":             self.role,
+            "phase":            phase,
+            "message":          str(raw.get("message", "")).strip()[:700],
+            "preferred_vendor": str(raw.get("preferred_vendor", "")).strip(),
+        }
+        if phase == "closing":
+            vote = str(raw.get("vote", "YES")).upper()
+            turn["vote"] = vote if vote in ("YES", "NO") else "YES"
+            try:
+                turn["confidence"] = max(0, min(100, int(raw.get("confidence", 75))))
+            except (ValueError, TypeError):
+                turn["confidence"] = 75
+        else:
+            turn["vote"] = ""
+            turn["confidence"] = None
+        return turn
+
+    def _debate_fallback(self, phase: str, vendors: list) -> dict:
+        pick = vendors[0] if vendors else ""
+        turn = {
+            "id":               self.agent_id,
+            "name":             self.name,
+            "icon":             self.icon,
+            "role":             self.role,
+            "phase":            phase,
+            "message":          (
+                f"[offline] From a {self.role} standpoint, {pick} appears to be the "
+                f"stronger fit given the brief."
+            ),
+            "preferred_vendor": pick,
+        }
+        if phase == "closing":
+            turn["vote"] = "YES"
+            turn["confidence"] = 70
+        else:
+            turn["vote"] = ""
+            turn["confidence"] = None
+        return turn
