@@ -1,0 +1,24 @@
+# Environment / secrets — never commit
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Database files
+backend/data/nexus.db
+backend/data/uploads/
+backend/data/sessions/
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+
+# OS
+.DS_Store

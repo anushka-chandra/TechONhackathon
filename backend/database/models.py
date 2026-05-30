@@ -131,6 +131,7 @@ class Step3VendorInput(Base):
     session_id:        Mapped[str]            = mapped_column(ForeignKey("sessions.id"), nullable=False, unique=True)
     method:            Mapped[str]            = mapped_column(String(20), nullable=False)   # "upload" | "search"
     vendor_names_json: Mapped[Optional[str]]  = mapped_column(Text, nullable=True)          # JSON list or NULL
+    vendor_text:       Mapped[Optional[str]]  = mapped_column(Text, nullable=True)          # extracted PDF text
     submitted_at:      Mapped[datetime]       = mapped_column(DateTime, nullable=False, default=_now)
 
     session: Mapped["Session"] = relationship(back_populates="step3")
@@ -147,5 +148,6 @@ class Step3VendorInput(Base):
         return {
             "method":       self.method,
             "vendor_names": self.vendor_names,
+            "vendor_text":  self.vendor_text,
             "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
         }
