@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 app = FastAPI(title="AI Purchasing Society API", version="1.0.0")
 
@@ -13,11 +13,25 @@ app.add_middleware(
 )
 
 
+# Maps landing-page agent IDs to simulation agent IDs
+AGENT_ID_MAP = {
+    "ceo":         "ceo",
+    "cfo":         "finance",
+    "cto":         "engineering",
+    "cso":         "security",
+    "finance":     "finance",
+    "engineering": "engineering",
+    "security":    "security",
+    "procurement": "procurement",
+}
+
+
 class SimulateRequest(BaseModel):
     target: str = "Project Management Software"
     users: int = 100
     budget: float = 30000
     vendors: List[str] = ["Asana", "Monday.com"]
+    selected_agents: Optional[List[str]] = None  # IDs from the landing page
 
 
 @app.get("/")
@@ -198,6 +212,11 @@ def simulate(req: SimulateRequest):
             "worst": [9800, 12200, 15800],
         },
     }
+
+    # Filter to only the agents chosen on the landing page (if provided)
+    if req.selected_agents:
+        allowed = {AGENT_ID_MAP.get(a, a) for a in req.selected_agents}
+        agents = [a for a in agents if a["id"] in allowed]
 
     yes_votes = sum(1 for a in agents if a["vote"] == "YES")
     no_votes = sum(1 for a in agents if a["vote"] == "NO")

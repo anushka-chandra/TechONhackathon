@@ -96,7 +96,6 @@ export default function LandingPage() {
   function goToStep2() {
     if (!requirements.trim()) return
     setStep(2)
-    setTimeout(() => setIsPanelOpen(true), 300)
   }
 
   // ── Step 2 → 3 ────────────────────────────────────────────────────
@@ -214,8 +213,35 @@ export default function LandingPage() {
             Select your AI Board.
           </h1>
           <p className="text-lg font-light max-w-2xl mx-auto" style={{ color: '#9ca3af' }}>
-            We&apos;ve opened the agent panel. Select which executive perspectives should evaluate the proposals.
+            Choose which executive perspectives should evaluate the proposals.
           </p>
+          <button
+            onClick={() => setIsPanelOpen(true)}
+            className="mt-8 inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200"
+            style={{
+              background: 'rgba(255,255,255,.06)',
+              border: '1px solid rgba(255,255,255,.12)',
+              color: '#e5e7eb',
+              backdropFilter: 'blur(8px)',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.1)'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,.25)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.06)'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,.12)'
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Open Board Selection
+          </button>
         </div>
 
         {/* Step 3 */}
@@ -331,33 +357,37 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* Panel overlay */}
+      {/* Modal overlay */}
       <div
-        id="panel-overlay"
         className="fixed inset-0 z-40"
         style={{
-          background: 'rgba(0,0,0,.5)',
-          backdropFilter: 'blur(4px)',
+          background: 'rgba(0,0,0,.6)',
+          backdropFilter: 'blur(6px)',
           opacity: isPanelOpen ? 1 : 0,
-          pointerEvents: isPanelOpen && step !== 2 ? 'auto' : isPanelOpen ? 'none' : 'none',
+          pointerEvents: isPanelOpen ? 'auto' : 'none',
           transition: 'opacity .3s ease',
         }}
-        onClick={() => { if (step !== 2) setIsPanelOpen(false) }}
+        onClick={() => setIsPanelOpen(false)}
       />
 
-      {/* Agent Panel */}
+      {/* Agent Panel — centered modal */}
       <aside
-        id="agent-panel"
-        className={`glass-panel fixed z-50 flex flex-col
-          bottom-0 left-0 w-full rounded-t-3xl border-t
-          md:top-0 md:bottom-0 md:right-0 md:left-auto md:w-[400px] md:h-full md:border-t-0 md:border-l md:rounded-none md:rounded-l-3xl p-6
-          ${isPanelOpen ? 'panel-open' : 'panel-closed'}`}
-        style={{ height: '75vh' }}
+        className="glass-panel fixed z-50 flex flex-col rounded-3xl p-6"
+        style={{
+          top: '50%',
+          left: '50%',
+          width: '100%',
+          maxWidth: '440px',
+          maxHeight: '80vh',
+          transform: isPanelOpen
+            ? 'translate(-50%, -50%) scale(1)'
+            : 'translate(-50%, -50%) scale(0.94)',
+          opacity: isPanelOpen ? 1 : 0,
+          pointerEvents: isPanelOpen ? 'auto' : 'none',
+          transition: 'transform .35s cubic-bezier(.16,1,.3,1), opacity .3s ease',
+        }}
       >
-        {/* Mobile drag handle */}
-        <div className="w-12 h-1.5 rounded-full mx-auto mb-6 md:hidden" style={{ background: '#4b5563' }} />
-
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-medium">Select Evaluation Board</h2>
           <button
             onClick={() => setIsPanelOpen(false)}

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Trophy,
@@ -177,8 +178,17 @@ function StabilityBar({ vendor, pct, color, delay }: {
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
-export default function Home() {
-  const [target, setTarget] = useState('Project Management Software')
+function DashboardContent() {
+  const searchParams = useSearchParams()
+
+  // Seed state from landing-page URL params (requirements + agents)
+  const paramRequirements = searchParams.get('requirements') ?? ''
+  const paramAgents = searchParams.get('agents') ?? ''           // e.g. "ceo,cfo"
+  const fromLanding = Boolean(paramRequirements || paramAgents)
+
+  const [target, setTarget] = useState(
+    paramRequirements || 'Project Management Software'
+  )
   const [users, setUsers] = useState(100)
   const [budget, setBudget] = useState(30000)
   const [vendors, setVendors] = useState('Asana, Monday.com')
@@ -186,20 +196,30 @@ export default function Home() {
   const [result, setResult] = useState<SimResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Parse the comma-separated agent IDs passed from the landing page
+  const selectedAgents = paramAgents
+    ? paramAgents.split(',').map(a => a.trim()).filter(Boolean)
+    : []
+
   async function runSimulation() {
     setLoading(true)
     setResult(null)
     setError(null)
     try {
+      const body: Record<string, unknown> = {
+        target,
+        users,
+        budget,
+        vendors: vendors.split(',').map((v) => v.trim()).filter(Boolean),
+      }
+      // Only send selected_agents when they came from the landing page flow
+      if (selectedAgents.length > 0) {
+        body.selected_agents = selectedAgents
+      }
       const res = await fetch('http://localhost:8000/api/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          target,
-          users,
-          budget,
-          vendors: vendors.split(',').map((v) => v.trim()).filter(Boolean),
-        }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error(`API error: ${res.status}`)
       setResult(await res.json())
@@ -212,6 +232,12 @@ export default function Home() {
       setLoading(false)
     }
   }
+
+  // Auto-run when arriving from the landing page with pre-filled params
+  useEffect(() => {
+    if (fromLanding) runSimulation()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const vendorList = result ? Object.keys(result.decision_stability) : []
 
@@ -537,5 +563,17 @@ export default function Home() {
         AI Purchasing Society · Hackathon Demo · Next.js 16 + FastAPI
       </footer>
     </main>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center" style={{ background: '#0d1117' }}>
+        <p style={{ color: '#8b949e' }}>Loading…</p>
+      </main>
+    }>
+      <DashboardContent />
+    </Suspense>
   )
 }
