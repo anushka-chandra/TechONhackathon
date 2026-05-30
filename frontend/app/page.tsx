@@ -95,13 +95,15 @@ export default function LandingPage() {
 
   // ── Summarise + persist to sidebar history (fire-and-forget) ─────
   async function summarizeAndStore(text: string, agentIds: string) {
+    // Signal the sidebar immediately so the spinner appears
+    window.dispatchEvent(new Event('nexus_summarize_pending'))
     try {
       const res = await fetch('http://localhost:8000/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      if (!res.ok) return
+      if (!res.ok) throw new Error(`status ${res.status}`)
       const data = await res.json()
       const entry: ChatEntry = {
         id: Date.now().toString(),
@@ -114,9 +116,11 @@ export default function LandingPage() {
         localStorage.getItem('nexus_chats') || '[]'
       )
       localStorage.setItem('nexus_chats', JSON.stringify([...existing, entry]))
+      // This event also clears the spinner in the sidebar
       window.dispatchEvent(new Event('nexus_chat_updated'))
     } catch {
-      // silent — never block the UI flow
+      // Clear spinner even on failure so the UI isn't stuck
+      window.dispatchEvent(new Event('nexus_chat_updated'))
     }
   }
 
@@ -124,7 +128,6 @@ export default function LandingPage() {
   function goToStep2() {
     if (!requirements.trim()) return
     setStep(2)
-    // Kick off summarisation immediately; sidebar updates whenever it resolves
     summarizeAndStore(requirements, '')
   }
 

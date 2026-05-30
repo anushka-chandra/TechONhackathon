@@ -9,8 +9,8 @@ import {
   MessageSquare,
   ChevronRight,
   ChevronLeft,
-  Pencil,
   Trash2,
+  Loader2,
 } from 'lucide-react'
 
 export interface ChatEntry {
@@ -39,7 +39,7 @@ function NavItem({
     <button
       onClick={onClick}
       title={!expanded ? label : undefined}
-      className="flex items-center gap-3 w-full rounded-xl px-2.5 py-2 transition-all duration-150 group"
+      className="flex items-center gap-3 w-full rounded-xl px-2.5 py-2 transition-all duration-150"
       style={{
         background: active ? 'rgba(88,166,255,0.12)' : 'transparent',
         color: active ? '#58a6ff' : '#8b949e',
@@ -54,9 +54,7 @@ function NavItem({
       }}
     >
       <span className="shrink-0 w-5 h-5 flex items-center justify-center">{icon}</span>
-      {expanded && (
-        <span className="text-sm font-medium truncate">{label}</span>
-      )}
+      {expanded && <span className="text-sm font-medium truncate">{label}</span>}
     </button>
   )
 }
@@ -75,42 +73,27 @@ function ChatItem({
 
   return (
     <div
-      className="relative group flex items-start gap-2 w-full rounded-xl px-3 py-2 cursor-pointer transition-all"
-      style={{
-        background: hovered ? 'rgba(255,255,255,0.05)' : 'transparent',
-      }}
+      className="relative flex items-start gap-2 w-full rounded-xl px-3 py-2 cursor-pointer transition-all"
+      style={{ background: hovered ? 'rgba(255,255,255,0.05)' : 'transparent' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onOpen}
     >
-      <MessageSquare
-        className="w-3.5 h-3.5 mt-0.5 shrink-0"
-        style={{ color: '#6b7280' }}
-      />
-      <span
-        className="text-sm truncate flex-1 leading-snug"
-        style={{ color: '#c9d1d9' }}
-      >
+      <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#6b7280' }} />
+      <span className="text-sm truncate flex-1 leading-snug" style={{ color: '#c9d1d9' }}>
         {entry.summary}
       </span>
-
-      {/* Actions on hover */}
       {hovered && (
-        <div
-          className="flex items-center gap-1 shrink-0"
-          onClick={e => e.stopPropagation()}
+        <button
+          title="Delete"
+          className="p-1 rounded-md shrink-0 transition-colors"
+          style={{ color: '#6b7280' }}
+          onClick={e => { e.stopPropagation(); onDelete() }}
+          onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#f85149')}
+          onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#6b7280')}
         >
-          <button
-            title="Delete"
-            className="p-1 rounded-md transition-colors"
-            style={{ color: '#6b7280' }}
-            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#f85149')}
-            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#6b7280')}
-            onClick={onDelete}
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
+          <Trash2 className="w-3 h-3" />
+        </button>
       )}
     </div>
   )
@@ -118,15 +101,17 @@ function ChatItem({
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 export default function Sidebar() {
-  const [expanded, setExpanded] = useState(false)
+  // Start expanded so summaries are immediately visible
+  const [expanded, setExpanded] = useState(true)
   const [chats, setChats] = useState<ChatEntry[]>([])
+  const [summarizing, setSummarizing] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
   function loadChats() {
     try {
       const raw = localStorage.getItem('nexus_chats')
-      setChats(raw ? JSON.parse(raw) : [])
+      setChats(raw ? (JSON.parse(raw) as ChatEntry[]) : [])
     } catch {
       setChats([])
     }
@@ -134,9 +119,27 @@ export default function Sidebar() {
 
   useEffect(() => {
     loadChats()
-    const handler = () => loadChats()
-    window.addEventListener('nexus_chat_updated', handler)
-    return () => window.removeEventListener('nexus_chat_updated', handler)
+
+    // New summary ready
+    const onUpdate = () => {
+      loadChats()
+      setSummarizing(false)
+      // Auto-expand so the user sees the new entry
+      setExpanded(true)
+    }
+
+    // Summarization started (dispatched by page.tsx before the fetch)
+    const onPending = () => {
+      setSummarizing(true)
+      setExpanded(true)   // open sidebar so the spinner is visible
+    }
+
+    window.addEventListener('nexus_chat_updated', onUpdate)
+    window.addEventListener('nexus_summarize_pending', onPending)
+    return () => {
+      window.removeEventListener('nexus_chat_updated', onUpdate)
+      window.removeEventListener('nexus_summarize_pending', onPending)
+    }
   }, [])
 
   function deleteChat(id: string) {
@@ -153,15 +156,11 @@ export default function Sidebar() {
     router.push(`/dashboard?${params.toString()}`)
   }
 
-  function newChat() {
-    router.push('/')
-  }
-
   const reversedChats = [...chats].reverse()
 
   return (
     <div
-      className="flex flex-col shrink-0 overflow-hidden border-r"
+      className="flex flex-col shrink-0 border-r"
       style={{
         width: expanded ? '256px' : '64px',
         minWidth: expanded ? '256px' : '64px',
@@ -172,6 +171,7 @@ export default function Sidebar() {
         top: 0,
         transition: 'width 0.3s cubic-bezier(0.16,1,0.3,1), min-width 0.3s cubic-bezier(0.16,1,0.3,1)',
         zIndex: 20,
+        overflow: 'hidden',
       }}
     >
       {/* Header */}
@@ -181,7 +181,7 @@ export default function Sidebar() {
       >
         {expanded && (
           <span
-            className="text-sm font-semibold tracking-tight mr-auto pl-1 overflow-hidden whitespace-nowrap"
+            className="text-sm font-semibold tracking-tight mr-auto pl-1 whitespace-nowrap overflow-hidden"
             style={{ color: '#e6edf3' }}
           >
             Nexus
@@ -201,9 +201,7 @@ export default function Sidebar() {
           }}
           title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
         >
-          {expanded
-            ? <ChevronLeft className="w-4 h-4" />
-            : <ChevronRight className="w-4 h-4" />}
+          {expanded ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
       </div>
 
@@ -220,7 +218,7 @@ export default function Sidebar() {
           icon={<Plus className="w-[18px] h-[18px]" />}
           label="New Chat"
           expanded={expanded}
-          onClick={newChat}
+          onClick={() => router.push('/')}
         />
         <NavItem
           icon={<Settings className="w-[18px] h-[18px]" />}
@@ -234,44 +232,52 @@ export default function Sidebar() {
       {/* Divider */}
       <div style={{ height: '1px', background: '#21262d', margin: '4px 12px' }} />
 
-      {/* Chat history (only when expanded) */}
+      {/* Session history — only in expanded mode */}
       {expanded && (
         <div className="flex-1 overflow-y-auto p-2">
-          {reversedChats.length === 0 ? (
-            <p
-              className="text-xs px-3 py-3 text-center leading-relaxed"
-              style={{ color: '#484f58' }}
-            >
-              Your summarised sessions will appear here after you submit a requirement.
+
+          {/* Summarizing spinner */}
+          {summarizing && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-1 rounded-xl"
+              style={{ background: 'rgba(88,166,255,0.07)', border: '1px solid rgba(88,166,255,0.15)' }}>
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: '#58a6ff' }} />
+              <span className="text-xs" style={{ color: '#58a6ff' }}>Summarizing…</span>
+            </div>
+          )}
+
+          {reversedChats.length === 0 && !summarizing ? (
+            <p className="text-xs px-3 py-3 text-center leading-relaxed"
+              style={{ color: '#484f58' }}>
+              Your sessions will appear here after you submit a requirement in Step 1.
             </p>
           ) : (
-            <>
-              <p
-                className="text-xs px-3 pb-2 font-semibold uppercase tracking-wider"
-                style={{ color: '#484f58' }}
-              >
-                Recent
-              </p>
-              {reversedChats.map(entry => (
-                <ChatItem
-                  key={entry.id}
-                  entry={entry}
-                  onOpen={() => openChat(entry)}
-                  onDelete={() => deleteChat(entry.id)}
-                />
-              ))}
-            </>
+            reversedChats.length > 0 && (
+              <>
+                <p className="text-xs px-3 pb-2 font-semibold uppercase tracking-wider"
+                  style={{ color: '#484f58' }}>
+                  Recent
+                </p>
+                {reversedChats.map(entry => (
+                  <ChatItem
+                    key={entry.id}
+                    entry={entry}
+                    onOpen={() => openChat(entry)}
+                    onDelete={() => deleteChat(entry.id)}
+                  />
+                ))}
+              </>
+            )
           )}
         </div>
       )}
 
-      {/* Collapsed: show history icon as hint */}
-      {!expanded && chats.length > 0 && (
-        <div className="flex flex-col items-center pt-1 gap-0.5 px-2">
+      {/* Collapsed: badge counter hint */}
+      {!expanded && (
+        <div className="flex flex-col items-center pt-1 px-2">
           <div
-            className="w-full flex items-center justify-center py-2 rounded-xl cursor-pointer"
+            className="w-full flex items-center justify-center py-2 rounded-xl cursor-pointer relative"
             style={{ color: '#484f58' }}
-            title={`${chats.length} saved session${chats.length > 1 ? 's' : ''} — expand to view`}
+            title={summarizing ? 'Summarizing…' : `${chats.length} saved session${chats.length !== 1 ? 's' : ''} — expand to view`}
             onClick={() => setExpanded(true)}
             onMouseEnter={e => {
               (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
@@ -282,15 +288,22 @@ export default function Sidebar() {
               ;(e.currentTarget as HTMLElement).style.color = '#484f58'
             }}
           >
-            <div className="relative">
-              <MessageSquare className="w-[18px] h-[18px]" />
-              <span
-                className="absolute -top-1.5 -right-1.5 text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center"
-                style={{ background: '#58a6ff', color: '#0d1117' }}
-              >
-                {chats.length > 9 ? '9+' : chats.length}
-              </span>
-            </div>
+            {summarizing
+              ? <Loader2 className="w-[18px] h-[18px] animate-spin" style={{ color: '#58a6ff' }} />
+              : (
+                <div className="relative">
+                  <MessageSquare className="w-[18px] h-[18px]" />
+                  {chats.length > 0 && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center"
+                      style={{ background: '#58a6ff', color: '#0d1117' }}
+                    >
+                      {chats.length > 9 ? '9+' : chats.length}
+                    </span>
+                  )}
+                </div>
+              )
+            }
           </div>
         </div>
       )}
