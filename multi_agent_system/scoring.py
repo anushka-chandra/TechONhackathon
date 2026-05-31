@@ -83,6 +83,15 @@ def _normalise_card(raw: dict, vendor_name: str) -> dict:
             "evidence":     str(m.get("evidence", "")).strip()[:300],
         })
 
+    # Derive hard_constraints_passed from individual row scores — do NOT trust the LLM's
+    # top-level boolean because the LLM frequently sets it True even when mandatory rows fail.
+    mandatory_rows = [m for m in matrix if m.get("is_mandatory")]
+    if mandatory_rows:
+        computed_hard_passed = all(m["score"] >= 0.5 for m in mandatory_rows)
+    else:
+        # No mandatory rows identified — fall back to LLM's value, defaulting to False (safe)
+        computed_hard_passed = bool(raw.get("hard_constraints_passed", False))
+
     personas = {}
     raw_personas = raw.get("persona_alignment", {}) or {}
     for p in _PERSONAS:
@@ -98,7 +107,7 @@ def _normalise_card(raw: dict, vendor_name: str) -> dict:
 
     return {
         "vendor_name":             vendor_name,
-        "hard_constraints_passed": bool(raw.get("hard_constraints_passed", True)),
+        "hard_constraints_passed": computed_hard_passed,
         "requirements_matrix":     matrix,
         "persona_alignment":       personas,
         "analytical_summary": {
@@ -132,7 +141,7 @@ def _compute_score(card: dict) -> int:
     persona = max(0.0, min(1.0, persona))
 
     base = 0.5 * soft + 0.5 * persona
-    hard_modifier = 1.0 if card.get("hard_constraints_passed", True) else 0.25
+    hard_modifier = 1.0 if card.get("hard_constraints_passed", False) else 0.25
     return round(base * hard_modifier * 100)
 
 

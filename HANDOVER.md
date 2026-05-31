@@ -148,7 +148,9 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   infer features); `score_vendor` runs at **temperature=0** (deterministic) and feeds up to **10k**
   chars each of vendor_data and the transcript. `score_vendor` also runs a cheap
   `_detect_evidence_gaps()` pass first and injects a `<evidence_gaps>` block into the prompt to
-  pre-warn the scorer. `compute_derived_confidence(scorecards, vote_yes, vote_total)` returns an
+  pre-warn the scorer. `hard_constraints_passed` is **computed in Python** (`all(mandatory rows ≥
+  0.5)`) — the LLM's top-level boolean is NOT trusted; and `_compute_score` defaults the hard
+  modifier to the 0.25× penalty when the flag is missing. `compute_derived_confidence(scorecards, vote_yes, vote_total)` returns an
   auditable 10–97 confidence = 0.4·(winner−runner score gap) + 0.3·vote consensus + 0.3·winner score
   (used by `run_debate` for `decision.confidence`).
 
