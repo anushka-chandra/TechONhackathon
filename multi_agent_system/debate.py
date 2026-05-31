@@ -18,6 +18,7 @@ from multi_agent_system.orchestrator import (
     _extract_vendors,
     _pick_winner,
 )
+from multi_agent_system.scoring import score_all_vendors
 
 # Three debate rounds, in order
 PHASES: list[tuple[str, str]] = [
@@ -447,6 +448,14 @@ def run_debate(
             winner if t.get("vote") == "YES" else (vendor_list[-1] if vendor_list else ""),
         )
 
+    # ── Quantitative scoring: mathematically-auditable compatibility matrix ──────
+    transcript_text = "\n".join(f"{t['name']} ({t['phase']}): {t['message']}" for t in transcript)
+    scorecards = score_all_vendors(vendor_list, requirements, vendor_info, transcript_text)
+    if scorecards:
+        best_idx = max(range(len(scorecards)), key=lambda i: scorecards[i]["compatibility_score"])
+        winner = vendor_list[best_idx]
+        confidence = scorecards[best_idx]["compatibility_score"]
+
     synth = _synthesize(requirements, vendor_list, transcript, winner, confidence)
 
     agents_meta = [
@@ -468,5 +477,6 @@ def run_debate(
             "pros":         synth["pros"],
             "cons":         synth["cons"],
         },
+        "scorecards": scorecards,
         "powered_by": "real_agents",
     }

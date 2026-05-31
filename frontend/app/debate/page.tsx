@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
-  Brain, ChevronDown, AlertTriangle, Trash2, Pencil, Check, Plus, Mail, Copy,
+  Brain, ChevronDown, AlertTriangle, Trash2, Pencil, Check, Plus, Mail, Copy, BarChart3,
 } from 'lucide-react'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -21,11 +21,22 @@ interface Decision {
   summary: string; justification: string
   pros: Record<string, string[]>; cons: Record<string, string[]>
 }
+interface MatrixRow { criterion: string; is_mandatory: boolean; score: number; evidence: string }
+interface PersonaScore { score: number; evidence: string }
+interface Scorecard {
+  vendor_name: string
+  hard_constraints_passed: boolean
+  compatibility_score: number
+  requirements_matrix: MatrixRow[]
+  persona_alignment: Record<string, PersonaScore>
+  analytical_summary: { primary_growth_driver: string; primary_risk_factor: string }
+}
 interface DebateResult {
   vendors: string[]
   agents: { id: string; name: string; icon: string; role: string }[]
   rounds: Round[]
   decision: Decision
+  scorecards?: Scorecard[]
   powered_by: string
 }
 
@@ -390,6 +401,8 @@ function DebateContent() {
     count: closingTurns.filter(t => (t.voted_for ?? '') === v).length,
   }))
   const maxSupport = Math.max(1, ...vendorSupport.map(s => s.count))
+  const scorecards = data?.scorecards ?? []
+  const PERSONA_KEYS = ['CEO', 'CTO', 'CFO', 'CSO']
 
   // Documents read from Step 3 — prefer the backend's classified list
   const docs: DocItem[] = context?.documents
@@ -736,6 +749,58 @@ function DebateContent() {
               ))}
             </div>
 
+            {/* Compatibility matrix (quantitative, auditable scoring) */}
+            {scorecards.length > 0 && (
+              <div>
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ color: '#e6edf3' }}>
+                  <BarChart3 className="w-5 h-5" style={{ color: '#58a6ff' }} /> Compatibility Matrix
+                  <span className="text-xs font-normal" style={{ color: '#8b949e' }}>· quantitative score</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {[...scorecards].sort((a, b) => b.compatibility_score - a.compatibility_score).map(sc => (
+                    <div key={sc.vendor_name} className="rounded-xl border p-5"
+                      style={{ background: '#161b22', borderColor: sc.vendor_name === dec.winner ? '#3fb950' : '#30363d' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-sm" style={{ color: '#e6edf3' }}>{sc.vendor_name}</span>
+                        <span className="text-2xl font-black"
+                          style={{ color: sc.compatibility_score >= 60 ? '#3fb950' : sc.compatibility_score >= 35 ? '#d29922' : '#f85149' }}>
+                          {sc.compatibility_score}
+                          <span className="text-xs font-normal" style={{ color: '#8b949e' }}>/100</span>
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full mb-3" style={{ background: '#21262d' }}>
+                        <div className="h-full rounded-full"
+                          style={{ width: `${sc.compatibility_score}%`,
+                            background: sc.compatibility_score >= 60 ? '#3fb950' : sc.compatibility_score >= 35 ? '#d29922' : '#f85149' }} />
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-3"
+                        style={{ background: sc.hard_constraints_passed ? '#1f4a2a' : '#4a1f1f',
+                          color: sc.hard_constraints_passed ? '#3fb950' : '#f85149' }}>
+                        {sc.hard_constraints_passed ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        {sc.hard_constraints_passed ? 'Hard constraints passed' : 'Hard constraint failed'}
+                      </span>
+                      <div className="grid grid-cols-4 gap-2 mb-3">
+                        {PERSONA_KEYS.map(p => (
+                          <div key={p} className="text-center rounded-lg py-1.5" style={{ background: '#0d1117' }}
+                            title={sc.persona_alignment?.[p]?.evidence}>
+                            <p className="text-[10px]" style={{ color: '#8b949e' }}>{p}</p>
+                            <p className="text-sm font-bold" style={{ color: '#c9d1d9' }}>
+                              {sc.persona_alignment?.[p]?.score ?? '—'}<span className="text-[9px]" style={{ color: '#6b7280' }}>/5</span>
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      {sc.analytical_summary?.primary_risk_factor && (
+                        <p className="text-xs" style={{ color: '#8b949e' }}>
+                          <span style={{ color: '#f85149' }}>Risk:</span> {sc.analytical_summary.primary_risk_factor}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-center flex-wrap gap-3 pt-2">
               <button onClick={() => setShowReport(true)}
                 className="px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-2"
@@ -1006,6 +1071,52 @@ function DebateContent() {
                     </div>
                   ))}
                 </section>
+
+                {/* Compatibility matrix (auditable scoring) */}
+                {scorecards.length > 0 && (
+                  <section className="report-section">
+                    <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#6b7280' }}>
+                      Compatibility Matrix (quantitative scoring)
+                    </h2>
+                    {[...scorecards].sort((a, b) => b.compatibility_score - a.compatibility_score).map(sc => (
+                      <div key={sc.vendor_name} className="mb-4 rounded-lg p-3"
+                        style={{ border: `1px solid ${sc.vendor_name === dec.winner ? '#bbf7d0' : '#e5e7eb'}`,
+                          background: sc.vendor_name === dec.winner ? '#f0fdf4' : '#ffffff' }}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-sm">{sc.vendor_name}</span>
+                          <span className="text-sm font-black"
+                            style={{ color: sc.compatibility_score >= 60 ? '#15803d' : sc.compatibility_score >= 35 ? '#b45309' : '#b91c1c' }}>
+                            {sc.compatibility_score}/100 · {sc.hard_constraints_passed ? 'hard constraints passed' : 'hard constraint FAILED'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] mb-2" style={{ color: '#6b7280' }}>
+                          {PERSONA_KEYS.map(p => `${p} ${sc.persona_alignment?.[p]?.score ?? '—'}/5`).join('  ·  ')}
+                        </p>
+                        {sc.requirements_matrix.length > 0 && (
+                          <table className="w-full text-[11px]" style={{ color: '#374151' }}>
+                            <tbody>
+                              {sc.requirements_matrix.map((m, i) => (
+                                <tr key={i} style={{ borderTop: '1px solid #f1f5f9' }}>
+                                  <td className="py-1 pr-2 align-top" style={{ width: '32%' }}>
+                                    {m.criterion}{m.is_mandatory && <span style={{ color: '#b91c1c' }}> *</span>}
+                                  </td>
+                                  <td className="py-1 pr-2 align-top font-bold" style={{ width: '8%' }}>{m.score.toFixed(1)}</td>
+                                  <td className="py-1 align-top" style={{ color: '#6b7280' }}>{m.evidence}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                        {sc.analytical_summary?.primary_risk_factor && (
+                          <p className="text-[11px] mt-2" style={{ color: '#374151' }}>
+                            <b>Risk:</b> {sc.analytical_summary.primary_risk_factor}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    <p className="text-[10px]" style={{ color: '#9ca3af' }}>* mandatory (hard) constraint</p>
+                  </section>
+                )}
 
                 {/* Full transcript */}
                 <section>
