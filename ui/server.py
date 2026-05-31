@@ -602,6 +602,58 @@ def requirement_summary(req: SummarizeRequest):
         return {"summary": _truncate_fallback(text), "bullets": [], "method": "fallback"}
 
 
+# ── Requirements assistant (Step 1 helper chatbot) ─────────────────────────────
+
+class AssistantMessage(BaseModel):
+    role: str
+    content: str
+
+
+class AssistantBody(BaseModel):
+    messages: List[AssistantMessage]
+
+
+@app.post("/api/requirements-assistant")
+def requirements_assistant(body: AssistantBody):
+    """
+    A friendly support chatbot that helps the user think through and define their
+    purchasing requirements in Step 1. Conversational, concise, asks clarifying
+    questions and suggests requirement dimensions.
+    """
+    from multi_agent_system.agents.base_agent import _client, _MODEL
+
+    system = (
+        "You are a friendly, concise procurement requirements assistant inside an app where the "
+        "user is about to define what they want to purchase. Help them think through and articulate "
+        "their needs. Ask one or two focused clarifying questions at a time, and suggest important "
+        "requirement dimensions when relevant: budget, number of users / scale, must-have features, "
+        "integrations, security & compliance (e.g. GDPR, SOC 2), hosting / data residency, support & "
+        "SLAs, and timeline. Keep replies short (2-5 sentences or a short bullet list). Be "
+        "encouraging and practical. Do not invent specific vendors or prices."
+    )
+
+    msgs = [{"role": "system", "content": system}]
+    for m in body.messages[-12:]:
+        role = m.role if m.role in ("user", "assistant") else "user"
+        msgs.append({"role": role, "content": (m.content or "")[:2000]})
+
+    try:
+        resp = _client().chat.completions.create(
+            model=_MODEL,
+            messages=msgs,
+            max_tokens=400,
+            temperature=0.5,
+        )
+        reply = (resp.choices[0].message.content or "").strip()
+        return {"reply": reply or "Could you tell me a bit more about what you're looking to buy?"}
+    except Exception:
+        return {"reply": (
+            "I'm having trouble connecting right now. In the meantime, a good requirement covers: "
+            "budget, number of users, must-have features, key integrations, and any security or "
+            "compliance needs."
+        )}
+
+
 # ── Session endpoints (SQLite via SQLAlchemy) ──────────────────────────────────
 
 class Step1Body(BaseModel):

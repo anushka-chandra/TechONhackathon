@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@/context/ChatContext'
 
@@ -100,6 +100,15 @@ export default function LandingPage() {
   const [searchInclude, setSearchInclude] = useState('')
   const [searchCount, setSearchCount] = useState(3)
   const [searchLoading, setSearchLoading] = useState(false)
+
+  // ── Step 1: requirements assistant chatbot ─────────────────────────
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [assistantInput, setAssistantInput] = useState('')
+  const [assistantLoading, setAssistantLoading] = useState(false)
+  const [assistantMessages, setAssistantMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
+    { role: 'assistant', content: "Hi! I'm here to help you define your requirements. What are you looking to purchase? I can suggest things to consider — budget, number of users, must-have features, integrations, security & compliance, and more." },
+  ])
+  const assistantEndRef = useRef<HTMLDivElement>(null)
 
   // Sources gathered in Step 3 (uploaded files + AI-found vendors), each classified
   const [documents, setDocuments] = useState<UploadedDoc[]>([])
@@ -328,6 +337,39 @@ export default function LandingPage() {
   // ── Keyboard (onKeyDown — onKeyPress removed in React 19) ────────
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && requirements.trim()) goToStep2()
+  }
+
+  // ── Requirements assistant chat ────────────────────────────────────
+  useEffect(() => {
+    assistantEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [assistantMessages, assistantLoading, assistantOpen])
+
+  async function sendAssistant() {
+    const text = assistantInput.trim()
+    if (!text || assistantLoading) return
+    const next = [...assistantMessages, { role: 'user' as const, content: text }]
+    setAssistantMessages(next)
+    setAssistantInput('')
+    setAssistantLoading(true)
+    try {
+      const res = await fetch('/api/py/requirements-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: next }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setAssistantMessages(m => [...m, { role: 'assistant', content: data.reply }])
+    } catch {
+      setAssistantMessages(m => [...m, { role: 'assistant', content: "Sorry, I couldn't reach the assistant just now — please try again in a moment." }])
+    } finally {
+      setAssistantLoading(false)
+    }
+  }
+
+  function addToRequirements(text: string) {
+    setRequirements(prev => (prev.trim() ? `${prev.trim()} ${text}` : text))
+    inputRef.current?.focus()
   }
 
   // ── Render helpers ────────────────────────────────────────────────
@@ -832,6 +874,110 @@ export default function LandingPage() {
           {searchLoading ? (<><SpinnerIcon /> Searching for vendors…</>) : (<>Find Vendors &amp; Continue</>)}
         </button>
       </aside>
+
+      {/* ── Requirements assistant chatbot (Step 1) ───────────────────────────── */}
+      {phase === 'main' && step === 1 && (
+        <>
+          {/* Launcher bubble */}
+          {!assistantOpen && (
+            <button
+              onClick={() => setAssistantOpen(true)}
+              className="fixed z-40 flex items-center gap-2 rounded-full px-4 py-3 shadow-lg transition-transform hover:scale-105"
+              style={{ bottom: 24, right: 24, background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff' }}
+              title="Need help defining your requirements?"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span className="text-sm font-medium hidden sm:inline">Need help?</span>
+            </button>
+          )}
+
+          {/* Chat panel */}
+          {assistantOpen && (
+            <div className="glass-panel fixed z-50 flex flex-col rounded-3xl overflow-hidden"
+              style={{ bottom: 24, right: 24, width: 'min(380px, calc(100vw - 32px))', height: 'min(560px, 72vh)' }}>
+              {/* Header */}
+              <div className="flex items-center gap-2 px-4 py-3 shrink-0"
+                style={{ borderBottom: '1px solid rgba(255,255,255,.1)', background: 'rgba(124,58,237,.12)' }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                </div>
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold text-white">Requirements Assistant</p>
+                  <p className="text-[11px]" style={{ color: '#9ca3af' }}>Helps you define what to buy</p>
+                </div>
+                <button onClick={() => setAssistantOpen(false)} className="ml-auto p-1.5 rounded-lg" style={{ color: '#9ca3af' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                {assistantMessages.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className="max-w-[85%]">
+                      <div className="rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap"
+                        style={m.role === 'user'
+                          ? { background: '#4f46e5', color: '#fff', borderBottomRightRadius: 4 }
+                          : { background: 'rgba(255,255,255,.06)', color: '#e5e7eb', border: '1px solid rgba(255,255,255,.1)', borderBottomLeftRadius: 4 }}>
+                        {m.content}
+                      </div>
+                      {m.role === 'assistant' && i > 0 && (
+                        <button onClick={() => addToRequirements(m.content)}
+                          className="mt-1 ml-1 text-[11px] font-medium inline-flex items-center gap-1"
+                          style={{ color: '#a78bfa' }}>
+                          + Add to requirements
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {assistantLoading && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl px-4 py-3 flex items-center gap-1.5"
+                      style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)' }}>
+                      <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+                    </div>
+                  </div>
+                )}
+                <div ref={assistantEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="p-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                <div className="flex items-end gap-2 rounded-2xl p-1.5"
+                  style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)' }}>
+                  <input
+                    value={assistantInput}
+                    onChange={e => setAssistantInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') sendAssistant() }}
+                    placeholder="Ask anything about your requirements…"
+                    className="flex-1 bg-transparent border-none outline-none text-sm px-2 py-1.5"
+                    style={{ color: '#fff' }}
+                  />
+                  <button onClick={sendAssistant} disabled={!assistantInput.trim() || assistantLoading}
+                    className="p-2 rounded-xl text-white shrink-0 disabled:opacity-50"
+                    style={{ background: '#4f46e5' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" x2="19" y1="12" y2="12" /><polyline points="12 5 19 12 12 19" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
