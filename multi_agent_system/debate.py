@@ -18,7 +18,7 @@ from multi_agent_system.orchestrator import (
     _extract_vendors,
     _pick_winner,
 )
-from multi_agent_system.scoring import score_all_vendors, build_decision_matrix
+from multi_agent_system.scoring import score_all_vendors, build_decision_matrix, compute_derived_confidence
 
 # Three debate rounds, in order
 PHASES: list[tuple[str, str]] = [
@@ -454,7 +454,9 @@ def run_debate(
     if scorecards:
         best_idx = max(range(len(scorecards)), key=lambda i: scorecards[i]["compatibility_score"])
         winner = vendor_list[best_idx]
-        confidence = scorecards[best_idx]["compatibility_score"]
+        vote_yes = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") == "YES")
+        vote_total = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") in ("YES", "NO"))
+        confidence = compute_derived_confidence(scorecards, vote_yes, vote_total)
 
     synth = _synthesize(requirements, vendor_list, transcript, winner, confidence)
 

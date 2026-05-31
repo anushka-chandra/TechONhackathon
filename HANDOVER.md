@@ -129,7 +129,9 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   into the debate; ignore unless asked.
 - `orchestrator.py` — `run_society()` (one-shot, used by `/api/simulate`), `AGENT_REGISTRY`,
   `_pick_winner`, `_extract_vendors`.
-- `debate.py` — the core: `run_debate()` (3 rounds → moderator synth → **scoring drives winner**),
+- `debate.py` — the core: `run_debate()` (3 rounds → moderator synth → **scoring drives winner**;
+  the decision **confidence is now `compute_derived_confidence(scorecards, vote_yes, vote_total)`**,
+  i.e. an auditable formula, NOT the LLM's self-reported number),
   `extract_vendor_names()` (cap 4, excludes noise), `detect_category()`, `classify_documents()`
   (vendor vs noise, any product type), `search_vendors()` (`:online` first, knowledge fallback,
   context_docs = good files only), `draft_negotiation_email()`.
@@ -144,7 +146,11 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   Scoring rigor: `SCORING_SYSTEM_PROMPT` starts with an **Evidence-First rule** (rule 0 — no
   evidence in `<vendor_data>` ⇒ soft score 0.0 / mandatory `hard_constraints_passed=false`; never
   infer features); `score_vendor` runs at **temperature=0** (deterministic) and feeds up to **10k**
-  chars each of vendor_data and the transcript.
+  chars each of vendor_data and the transcript. `score_vendor` also runs a cheap
+  `_detect_evidence_gaps()` pass first and injects a `<evidence_gaps>` block into the prompt to
+  pre-warn the scorer. `compute_derived_confidence(scorecards, vote_yes, vote_total)` returns an
+  auditable 10–97 confidence = 0.4·(winner−runner score gap) + 0.3·vote consensus + 0.3·winner score
+  (used by `run_debate` for `decision.confidence`).
 
 ---
 

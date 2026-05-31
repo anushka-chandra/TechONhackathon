@@ -149,12 +149,53 @@ def _fallback_card(vendor_name: str) -> dict:
     }
 
 
+def _detect_evidence_gaps(requirements: str, vendor_data: str, vendor_name: str) -> list[str]:
+    """
+    Returns a list of requirement topics that have no supporting evidence in the
+    vendor document. Used to pre-warn the scoring prompt. Returns [] on any
+    failure so it never blocks the pipeline.
+    """
+    if not vendor_data.strip() or not requirements.strip():
+        return []
+    try:
+        resp = _client().chat.completions.create(
+            model=_MODEL,
+            messages=[
+                {"role": "system", "content": "You identify missing information in vendor documents."},
+                {"role": "user", "content": (
+                    f"User requirements:\n{requirements[:3000]}\n\n"
+                    f"Vendor document for {vendor_name}:\n{vendor_data[:6000]}\n\n"
+                    "List every requirement topic from the user requirements that is NOT addressed "
+                    "anywhere in the vendor document. Be specific. "
+                    'Return JSON only: {"gaps": ["topic 1", "topic 2"]}'
+                )},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=300,
+            temperature=0,
+        )
+        result = json.loads(resp.choices[0].message.content)
+        return [str(g).strip() for g in result.get("gaps", []) if str(g).strip()]
+    except Exception:
+        return []
+
+
 def score_vendor(vendor_name: str, requirements: str, vendor_data: str, transcript: str) -> dict:
     """Score a single vendor; returns the normalised scorecard + compatibility_score."""
+    gaps = _detect_evidence_gaps(requirements, vendor_data or "", vendor_name)
+    gap_block = (
+        "\n\n<evidence_gaps>\nThe following requirement topics have NO supporting evidence "
+        "in the vendor document. You MUST score them 0.0 (soft) or mark hard_constraints_passed "
+        "= false (mandatory):\n"
+        + "\n".join(f"- {g}" for g in gaps)
+        + "\n</evidence_gaps>"
+        if gaps else ""
+    )
     user = (
         f"<user_requirements>\n{requirements}\n</user_requirements>\n\n"
         f"<vendor_data>\n{(vendor_data or 'No vendor documents provided.')[:10000]}\n</vendor_data>\n\n"
         f"<board_debate_transcript>\n{transcript[:10000]}\n</board_debate_transcript>\n\n"
+        f"{gap_block}"
         f"Target vendor to score: {vendor_name}\n"
         f"Return the JSON scorecard for THIS vendor only."
     )
@@ -287,3 +328,25 @@ def build_decision_matrix(scorecards: List[dict]) -> dict:
         "ranking": ranking,
         "explanation": explanation,
     }
+
+
+def compute_derived_confidence(scorecards: list[dict], vote_yes: int, vote_total: int) -> int:
+    """
+    Computes a mathematically derived confidence percentage for the winning
+    vendor. This replaces the LLM's self-reported confidence so the number is
+    fully auditable. Formula (weighted blend of three factors):
+    - gap_factor:     how much better the winner scores vs runner-up (weight 0.4)
+    - vote_factor:    board vote consensus (yes / total) (weight 0.3)
+    - quality_factor: absolute compatibility score of winner (weight 0.3)
+    Returns an integer 10-97 (never 0 or 100 — those aren't defensible).
+    """
+    if not scorecards:
+        return 50
+    sorted_cards = sorted(scorecards, key=lambda c: c.get("compatibility_score", 0), reverse=True)
+    winner_score = sorted_cards[0].get("compatibility_score", 50)
+    runner_score = sorted_cards[1].get("compatibility_score", 0) if len(sorted_cards) > 1 else 0
+    gap_factor = min((winner_score - runner_score) / 100, 1.0)
+    vote_factor = vote_yes / max(vote_total, 1)
+    quality_factor = winner_score / 100
+    raw = (0.4 * gap_factor + 0.3 * vote_factor + 0.3 * quality_factor) * 100
+    return round(min(max(raw, 10), 97))
