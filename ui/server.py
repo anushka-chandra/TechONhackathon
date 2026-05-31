@@ -1,4 +1,5 @@
 import os
+import re
 import requests as http
 from pathlib import Path
 from sqlalchemy import text
@@ -14,7 +15,9 @@ from backend.database import models as db_models
 from backend.database import crud
 from backend.pdf_extractor import extract_text
 from multi_agent_system.orchestrator import run_society
-from multi_agent_system.debate import run_debate, extract_vendor_names
+from multi_agent_system.debate import (
+    run_debate, extract_vendor_names, classify_documents, search_vendors,
+)
 
 # ── Create / migrate DB on startup ────────────────────────────────────────────
 db_models.Base.metadata.create_all(bind=engine)
@@ -116,22 +119,32 @@ def _stored_vendor_names(req: "SimulateRequest", db: DbSession) -> List[str]:
     return []
 
 
-def _is_generic(vendors: List[str]) -> bool:
-    """True if vendors are placeholder names (no real selection was made)."""
-    return all(v.strip().lower().startswith("option") for v in vendors) if vendors else True
-
-
 def _resolve_vendors(req: "SimulateRequest", db: DbSession, vendor_text: str) -> List[str]:
     """
-    Prefer real vendors detected from the uploaded documents over placeholder
-    ('Option A/B') names that the UI guesses when Step 1 has no vendor names.
+    When documents were uploaded, the vendors detected from them are the source
+    of truth — they always win over names the UI guessed from the Step 1 text.
+    Only fall back to the request's vendors when no documents were provided.
     """
-    stored = _stored_vendor_names(req, db)
-    if not stored and vendor_text.strip():
-        stored = extract_vendor_names(vendor_text)
-    if stored and (_is_generic(req.vendors) or len(req.vendors) < 2):
-        return stored
+    detected = _stored_vendor_names(req, db)
+    if not detected and vendor_text.strip():
+        detected = extract_vendor_names(vendor_text)
+    if len(detected) >= 2:
+        return detected[:4]
     return req.vendors
+
+
+def parse_documents(vendor_text: str) -> List[dict]:
+    """Split combined vendor text ('=== Document: name ===' headers) into docs."""
+    if not vendor_text.strip():
+        return []
+    parts = re.split(r"=== Document: (.+?) ===\n?", vendor_text)
+    docs: List[dict] = []
+    for i in range(1, len(parts), 2):
+        content = parts[i + 1].strip() if i + 1 < len(parts) else ""
+        docs.append({"name": parts[i].strip(), "content": content})
+    if not docs:
+        docs.append({"name": "Document", "content": vendor_text.strip()})
+    return docs
 
 
 @app.post("/api/context")
@@ -144,12 +157,28 @@ def context(req: SimulateRequest, db: DbSession = Depends(get_db)):
     vendor_text = _session_vendor_text(req, db)
     suggested = _resolve_vendors(req, db, vendor_text)
     req.vendors = suggested   # brief should reflect the real vendors
+
+    # Classify each uploaded document so the UI can flag non-vendor noise
+    parsed = parse_documents(vendor_text)
+    flags = classify_documents(parsed) if parsed else {}
+    documents = [
+        {
+            "name":      d["name"],
+            "content":   d["content"],
+            "chars":     len(d["content"]),
+            "is_vendor": flags.get(d["name"], {}).get("is_vendor", True),
+            "reason":    flags.get(d["name"], {}).get("reason", ""),
+        }
+        for d in parsed
+    ]
+
     return {
         "requirements":     req.target,
         "brief":            _build_brief(req),
         "vendor_text":      vendor_text,
         "has_documents":    bool(vendor_text.strip()),
         "suggested_vendors": suggested,
+        "documents":        documents,
     }
 
 
@@ -257,6 +286,125 @@ async def upload_vendor_files(
     }
 
 
+class VendorSearchBody(BaseModel):
+    field:        str
+    requirements: Optional[str]       = ""
+    count:        int                 = 3
+    must_include: Optional[List[str]] = None
+
+
+MAX_VENDORS = 4
+
+
+@app.post("/api/vendor-search/{session_id}")
+def vendor_search(session_id: str, body: VendorSearchBody, db: DbSession = Depends(get_db)):
+    """
+    AI vendor finder for Step 3: searches for real vendors in the given field and
+    APPENDS their briefs to the session's vendor text (same place uploaded PDFs
+    land). Respects a hard cap of 4 total vendors — if files are already present,
+    only the remaining slots are filled.
+    """
+    session = crud.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    existing_text = session.step3.vendor_text if session.step3 else ""
+    existing_names = (session.step3.vendor_names if session.step3 else []) or []
+    remaining = MAX_VENDORS - len(existing_names)
+
+    if remaining <= 0:
+        return {
+            "session_id": session_id,
+            "vendors":    existing_names,
+            "count":      len(existing_names),
+            "added":      [],
+            "message":    f"You already have {MAX_VENDORS} vendors (the maximum).",
+        }
+
+    # Need either an explicit field, or uploaded docs to base the search on
+    if not body.field.strip() and not existing_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Provide a field/category to search, or upload files to base the search on.",
+        )
+
+    found = search_vendors(
+        field=body.field,
+        requirements=body.requirements or "",
+        count=min(body.count, remaining),
+        must_include=body.must_include,
+        context_docs=existing_text,   # base the search on the user's uploaded files
+    )
+    # Drop any that duplicate an existing vendor, then keep only the remaining slots
+    existing_lower = {n.lower() for n in existing_names}
+    found = [v for v in found if v["name"].lower() not in existing_lower][:remaining]
+    if not found:
+        raise HTTPException(status_code=502, detail="Vendor search returned no new results")
+
+    new_block = "\n\n".join(
+        f"=== Document: {v['name']} (AI web search) ===\n{v['info']}" for v in found
+    )
+    merged_text = f"{existing_text}\n\n{new_block}".strip() if existing_text else new_block
+    merged_names = (existing_names + [v["name"] for v in found])[:MAX_VENDORS]
+
+    if not session.step3:
+        try:
+            session = crud.save_step3(db, session_id, method="search", vendor_names=merged_names)
+        except Exception:
+            pass
+    if session.step3:
+        # method reflects "both" once files + search are combined
+        session.step3.method = "both" if existing_text else "search"
+        session.step3.vendor_names = merged_names
+        session.step3.vendor_text = merged_text[:MAX_VENDOR_TEXT]
+        db.commit()
+
+    return {
+        "session_id": session_id,
+        "vendors":    merged_names,
+        "count":      len(merged_names),
+        "added":      [v["name"] for v in found],
+        "remaining":  MAX_VENDORS - len(merged_names),
+    }
+
+
+class RemoveDocBody(BaseModel):
+    filename: str
+
+
+@app.post("/api/sessions/{session_id}/remove-document")
+def remove_document(session_id: str, body: RemoveDocBody, db: DbSession = Depends(get_db)):
+    """
+    Remove a single uploaded document from a session (e.g. a flagged non-vendor
+    file), then re-detect the vendors from what remains.
+    """
+    session = crud.get_session(db, session_id)
+    if session is None or session.step3 is None:
+        raise HTTPException(status_code=404, detail="Session or documents not found")
+
+    docs = parse_documents(session.step3.vendor_text or "")
+    remaining = [d for d in docs if d["name"] != body.filename]
+
+    new_text = "\n\n".join(
+        f"=== Document: {d['name']} ===\n{d['content']}" for d in remaining
+    )
+    session.step3.vendor_text = new_text
+    session.step3.vendor_names = extract_vendor_names(new_text) if new_text.strip() else []
+    db.commit()
+
+    # Best-effort: delete the file from disk too
+    try:
+        (UPLOAD_DIR / f"{session_id}_{body.filename}").unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    return {
+        "removed":          body.filename,
+        "remaining":        len(remaining),
+        "detected_vendors": session.step3.vendor_names,
+    }
+
+
 # ── Summarise endpoint ─────────────────────────────────────────────────────────
 
 class SummarizeRequest(BaseModel):
@@ -312,6 +460,49 @@ def summarize(req: SummarizeRequest):
 
     except Exception:
         return {"summary": _truncate_fallback(req.text), "method": "error_fallback"}
+
+
+@app.post("/api/requirement-summary")
+def requirement_summary(req: SummarizeRequest):
+    """
+    Use the configured LLM (OpenRouter/Gemini) to distill the Step 1 text into a
+    short title plus a few concise requirement bullet points — only the relevant
+    purchasing requirements (budget, must-have features, constraints, scale).
+    """
+    import json as _json
+    from multi_agent_system.agents.base_agent import _client, _MODEL
+
+    text = (req.text or "").strip()
+    if not text:
+        return {"summary": "Untitled session", "bullets": [], "method": "empty"}
+
+    try:
+        resp = _client().chat.completions.create(
+            model=_MODEL,
+            messages=[
+                {"role": "system", "content":
+                    "You distill a company's procurement requirement into a short title and "
+                    "3-5 concise bullet points. Each bullet captures ONE concrete requirement "
+                    "(budget, must-have feature, integration, security/compliance, scale/users). "
+                    "Be terse — a few words per bullet, no full sentences, no fluff."},
+                {"role": "user", "content":
+                    f"Requirement:\n{text}\n\n"
+                    'Return JSON: {"summary": "<= 6 word title", "bullets": ["short requirement", ...]}'},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=220,
+            temperature=0.2,
+        )
+        data = _json.loads(resp.choices[0].message.content)
+        summary = str(data.get("summary", "")).strip()[:60]
+        bullets = [str(b).strip()[:80] for b in data.get("bullets", []) if str(b).strip()][:5]
+        return {
+            "summary": summary or _truncate_fallback(text),
+            "bullets": bullets,
+            "method": "llm",
+        }
+    except Exception:
+        return {"summary": _truncate_fallback(text), "bullets": [], "method": "fallback"}
 
 
 # ── Session endpoints (SQLite via SQLAlchemy) ──────────────────────────────────

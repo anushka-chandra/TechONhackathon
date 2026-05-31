@@ -86,6 +86,17 @@ export default function LandingPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // ── Step 3: AI vendor-search modal ─────────────────────────────────
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchField, setSearchField] = useState('')
+  const [searchInclude, setSearchInclude] = useState('')
+  const [searchCount, setSearchCount] = useState(3)
+  const [searchLoading, setSearchLoading] = useState(false)
+
+  // Vendors gathered so far in Step 3 (from uploads and/or AI search), capped at 4
+  const [gathered, setGathered] = useState<string[]>([])
+  const MAX_VENDORS = 4
+
   // ── Intro ──────────────────────────────────────────────────────────
   function handleBubbleClick() {
     if (phase !== 'intro') return
@@ -157,16 +168,19 @@ export default function LandingPage() {
       }
     } catch { /* backend unreachable — sidebar entry already visible */ }
 
-    // ③ Upgrade sidebar entry with smarter summary from /api/summarize
+    // ③ Upgrade entry with an AI-generated title + concise requirement bullets
     try {
-      const res = await fetch('/api/summarize', {
+      const res = await fetch('/api/py/requirement-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
       if (res.ok) {
         const data = await res.json()
-        if (data.summary) updateChat(chatId, { summary: data.summary })
+        const patch: { summary?: string; bullets?: string[] } = {}
+        if (data.summary) patch.summary = data.summary
+        if (Array.isArray(data.bullets) && data.bullets.length) patch.bullets = data.bullets
+        if (Object.keys(patch).length) updateChat(chatId, patch)
       }
     } catch { /* local summary already showing */ }
   }
@@ -215,20 +229,42 @@ export default function LandingPage() {
     router.push(`/debate?${params.toString()}`)
   }
 
-  // ── Step 3: AI web search (no file) ───────────────────────────────
-  function handleVendorChoice(choice: 'upload' | 'search') {
-    setActionLoading(choice)
-    if (sessionId) {
-      fetch(`/api/py/sessions/${sessionId}/step3`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: choice }),
-      }).catch(() => {})
-    }
-    setTimeout(goToDashboard, 1800)
+  // ── Step 3: open the AI vendor-search modal ───────────────────────
+  function openSearchModal() {
+    setSearchField('')        // start empty — user types the field/category
+    const remaining = Math.max(1, MAX_VENDORS - gathered.length)
+    setSearchCount(Math.min(3, remaining))
+    setSearchOpen(true)
   }
 
-  // ── Step 3: file upload → POST the PDF(s), extract text, then simulate ─
+  // ── Step 3: run the AI vendor search, accumulate the results ──────
+  async function handleVendorSearch() {
+    if (!searchField.trim() && gathered.length === 0) return   // need a field, or files to base on
+    setSearchLoading(true)
+    if (sessionId) {
+      try {
+        const must_include = searchInclude.split(',').map(s => s.trim()).filter(Boolean)
+        const res = await fetch(`/api/py/vendor-search/${sessionId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            field: searchField.trim(),
+            requirements,
+            count: searchCount,
+            must_include,
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data.vendors)) setGathered(data.vendors)
+        }
+      } catch { /* keep whatever is already gathered */ }
+    }
+    setSearchLoading(false)
+    setSearchOpen(false)
+  }
+
+  // ── Step 3: file upload → POST the PDF(s), accumulate detected vendors ─
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -245,14 +281,19 @@ export default function LandingPage() {
         // Upload every selected file in one request — backend extracts & combines text
         const fd = new FormData()
         Array.from(files).forEach(f => fd.append('files', f))
-        await fetch(`/api/py/upload/${sessionId}`, {
+        const res = await fetch(`/api/py/upload/${sessionId}`, {
           method: 'POST',
           body: fd,   // NOTE: no Content-Type header — browser sets the multipart boundary
         })
-      } catch { /* backend unreachable — proceed with simulation regardless */ }
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data.detected_vendors)) setGathered(data.detected_vendors)
+        }
+      } catch { /* keep whatever is already gathered */ }
     }
 
-    goToDashboard()
+    setActionLoading(null)
+    e.target.value = ''   // allow re-selecting the same file later
   }
 
   // ── Keyboard (onKeyDown — onKeyPress removed in React 19) ────────
@@ -380,7 +421,8 @@ export default function LandingPage() {
             Provide vendor information.
           </h1>
           <p className="text-lg font-light mb-12" style={{ color: '#9ca3af' }}>
-            Upload your existing vendor files or let our AI agent search the web for possible vendors and their offers.
+            Upload your existing vendor files and/or let our AI agent search the web — combine both if you like.
+            A maximum of {MAX_VENDORS} vendors will be compared.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
@@ -396,10 +438,10 @@ export default function LandingPage() {
 
             {/* Upload */}
             <button
-              className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4"
+              className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ border: '1px solid rgba(107,114,128,.5)' }}
               onClick={() => fileInputRef.current?.click()}
-              disabled={actionLoading !== null}
+              disabled={actionLoading !== null || gathered.length >= MAX_VENDORS}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(99,102,241,.1)', color: '#818cf8' }}>
@@ -422,10 +464,10 @@ export default function LandingPage() {
 
             {/* AI Search */}
             <button
-              className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4"
+              className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ border: '1px solid rgba(107,114,128,.5)' }}
-              onClick={() => handleVendorChoice('search')}
-              disabled={actionLoading !== null}
+              onClick={openSearchModal}
+              disabled={actionLoading !== null || gathered.length >= MAX_VENDORS}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(56,189,248,.1)', color: '#38bdf8' }}>
@@ -444,6 +486,52 @@ export default function LandingPage() {
                 </h3>
                 <p className="text-sm" style={{ color: '#9ca3af' }}>Let agents automatically find vendors online.</p>
               </div>
+            </button>
+          </div>
+
+          {/* Gathered vendors + continue */}
+          <div className="max-w-3xl mx-auto mt-8">
+            {gathered.length > 0 && (
+              <div className="rounded-2xl p-4 mb-5 text-left"
+                style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)' }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-medium text-white">Vendors gathered</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: gathered.length >= MAX_VENDORS ? 'rgba(244,63,94,.15)' : 'rgba(56,189,248,.15)',
+                      color: gathered.length >= MAX_VENDORS ? '#fb7185' : '#38bdf8' }}>
+                    {gathered.length} / {MAX_VENDORS}
+                  </span>
+                  {gathered.length >= MAX_VENDORS && (
+                    <span className="text-xs" style={{ color: '#9ca3af' }}>Maximum reached</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {gathered.map((v, i) => (
+                    <span key={i} className="text-xs px-2.5 py-1 rounded-full"
+                      style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', color: '#e5e7eb' }}>
+                      {v}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {gathered.length < 2 && (
+              <p className="text-xs text-center mb-2" style={{ color: '#9ca3af' }}>
+                Add at least 2 vendors (via upload and/or AI search) to start the debate.
+              </p>
+            )}
+            <button
+              onClick={goToDashboard}
+              disabled={gathered.length < 2}
+              className="w-full p-3.5 rounded-2xl text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: '#4f46e5', boxShadow: gathered.length >= 2 ? '0 0 15px rgba(79,70,229,.35)' : 'none' }}
+            >
+              Continue to debate
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" x2="19" y1="12" y2="12" /><polyline points="12 5 19 12 12 19" />
+              </svg>
             </button>
           </div>
         </div>
@@ -584,6 +672,105 @@ export default function LandingPage() {
             Apply Selection
           </button>
         </div>
+      </aside>
+
+      {/* ── AI vendor-search modal (Step 3) ─────────────────────────────── */}
+      <div
+        className="fixed inset-0 z-40"
+        style={{
+          background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)',
+          opacity: searchOpen ? 1 : 0,
+          pointerEvents: searchOpen ? 'auto' : 'none',
+          transition: 'opacity .3s ease',
+        }}
+        onClick={() => !searchLoading && setSearchOpen(false)}
+      />
+      <aside
+        className="glass-panel fixed z-50 flex flex-col rounded-3xl p-6"
+        style={{
+          top: '50%', left: '50%', width: '100%', maxWidth: '460px',
+          transform: searchOpen ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.94)',
+          opacity: searchOpen ? 1 : 0,
+          pointerEvents: searchOpen ? 'auto' : 'none',
+          transition: 'transform .35s cubic-bezier(.16,1,.3,1), opacity .3s ease',
+        }}
+      >
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-xl font-medium">Find vendors with AI</h2>
+          {!searchLoading && (
+            <button onClick={() => setSearchOpen(false)} className="p-2 rounded-full" style={{ color: '#9ca3af' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <p className="text-sm mb-5" style={{ color: '#9ca3af' }}>
+          Tell the agent what kind of vendors to look for. It will find up to 4 real options and
+          add their details to the brief sent to your AI board.
+        </p>
+
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
+          What field / category should we search?
+          {gathered.length > 0 && <span style={{ color: '#6b7280' }}> (optional)</span>}
+        </label>
+        <input
+          value={searchField}
+          onChange={e => setSearchField(e.target.value)}
+          placeholder="e.g. project management software, CRM, helpdesk"
+          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mb-1.5"
+          style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
+          autoFocus
+        />
+        {gathered.length > 0 && (
+          <p className="text-[11px] mb-4" style={{ color: '#818cf8' }}>
+            Leave blank to find vendors comparable to your uploaded files.
+          </p>
+        )}
+        {gathered.length === 0 && <div className="mb-4" />}
+
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
+          Specific vendors to include <span style={{ color: '#6b7280' }}>(optional, comma-separated)</span>
+        </label>
+        <input
+          value={searchInclude}
+          onChange={e => setSearchInclude(e.target.value)}
+          placeholder="e.g. Asana, Jira"
+          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mb-4"
+          style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
+        />
+
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
+          How many vendors to add?{' '}
+          <span style={{ color: '#6b7280' }}>
+            {gathered.length > 0
+              ? `(${MAX_VENDORS - gathered.length} slot${MAX_VENDORS - gathered.length !== 1 ? 's' : ''} left — already have ${gathered.length})`
+              : '(max 4)'}
+          </span>
+        </label>
+        <div className="flex gap-2 mb-6">
+          {Array.from({ length: Math.max(1, MAX_VENDORS - gathered.length) }, (_, i) => i + 1).map(n => (
+            <button key={n} onClick={() => setSearchCount(n)}
+              className="flex-1 py-2 rounded-xl text-sm font-medium transition-colors"
+              style={{
+                background: searchCount === n ? '#4f46e5' : 'rgba(255,255,255,.05)',
+                border: `1px solid ${searchCount === n ? '#6366f1' : 'rgba(255,255,255,.12)'}`,
+                color: '#fff',
+              }}>
+              {n}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={handleVendorSearch}
+          disabled={(!searchField.trim() && gathered.length === 0) || searchLoading}
+          className="w-full p-3 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ background: '#4f46e5', boxShadow: (searchField.trim() || gathered.length > 0) ? '0 0 15px rgba(79,70,229,.4)' : 'none' }}
+        >
+          {searchLoading ? (<><SpinnerIcon /> Searching for vendors…</>) : (<>Find Vendors &amp; Continue</>)}
+        </button>
       </aside>
     </div>
   )

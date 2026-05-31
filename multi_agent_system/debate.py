@@ -27,7 +27,7 @@ PHASES: list[tuple[str, str]] = [
 ]
 
 
-def extract_vendor_names(text: str, max_vendors: int = 5) -> List[str]:
+def extract_vendor_names(text: str, max_vendors: int = 4) -> List[str]:
     """
     Identify the distinct vendors/products actually being proposed in the
     uploaded documents. Irrelevant files (e.g. a recipe) are excluded.
@@ -62,6 +62,130 @@ def extract_vendor_names(text: str, max_vendors: int = 5) -> List[str]:
         return seen[:max_vendors]
     except Exception:
         return []
+
+
+def classify_documents(documents: List[dict]) -> dict:
+    """
+    Classify each uploaded file as a genuine vendor/product proposal or unrelated
+    noise (e.g. a recipe). documents: [{"name": str, "content": str}, ...].
+    Returns {name: {"is_vendor": bool, "reason": str}}; {} on any failure.
+    """
+    if not documents:
+        return {}
+    try:
+        listing = "\n\n".join(
+            f"[{i}] FILE: {d['name']}\n{d['content'][:1500]}"
+            for i, d in enumerate(documents)
+        )
+        resp = _client().chat.completions.create(
+            model=_MODEL,
+            messages=[
+                {"role": "system", "content":
+                    "You classify whether each uploaded file is a genuine vendor or product "
+                    "proposal relevant to a software procurement decision, or unrelated noise "
+                    "(e.g. a recipe, a personal note, marketing fluff with no product). Be strict."},
+                {"role": "user", "content":
+                    f"Classify each file below.\n\n{listing}\n\n"
+                    'Return JSON: {"files": [{"index": 0, "is_vendor": true, '
+                    '"reason": "<short reason, max ~12 words>"}]}'},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=400,
+            temperature=0,
+        )
+        data = json.loads(resp.choices[0].message.content)
+        out: dict = {}
+        for item in data.get("files", []):
+            idx = item.get("index")
+            if isinstance(idx, int) and 0 <= idx < len(documents):
+                out[documents[idx]["name"]] = {
+                    "is_vendor": bool(item.get("is_vendor", True)),
+                    "reason": str(item.get("reason", "")).strip()[:160],
+                }
+        return out
+    except Exception:
+        return {}
+
+
+def search_vendors(
+    field: str,
+    requirements: str = "",
+    count: int = 3,
+    must_include: Optional[List[str]] = None,
+    context_docs: str = "",
+) -> List[dict]:
+    """
+    Find up to `count` (hard-capped at 4) real vendors/products and produce a
+    concise factual brief for each. If `field` is empty, the category is inferred
+    from `context_docs` (the user's already-uploaded vendor files), and the search
+    looks for COMPARABLE additional vendors not already present.
+    Tries OpenRouter web search (':online') first, then the model's own knowledge.
+    Returns [{"name": str, "info": str}, ...]; [] on failure.
+    """
+    count = max(1, min(4, count))
+    must = ", ".join(m for m in (must_include or []) if m.strip())
+
+    system = (
+        "You are a procurement market researcher. You identify real, currently-available "
+        "software vendors/products and write a concise factual brief for each."
+    )
+
+    parts: List[str] = []
+    if field.strip():
+        parts.append(f"Find up to {count} real vendors/products in this category: {field}.")
+    else:
+        parts.append(
+            f"Find up to {count} real vendors/products in the SAME category as the "
+            "uploaded documents shown below."
+        )
+    if requirements.strip():
+        parts.append(f"Buyer's needs/context: {requirements}")
+    if context_docs.strip():
+        parts.append(
+            "The buyer has already shared these vendor documents. Use them to understand the "
+            "category, price range, and desired capabilities, and find COMPARABLE additional "
+            "vendors. Do NOT repeat any vendor already described here:\n"
+            + context_docs[:4000]
+        )
+    if must:
+        parts.append(f"Be sure to include these if they fit: {must}")
+    parts.append(
+        f"Return AT MOST {count} vendors. For each, give the real product name and a concise brief "
+        "covering what it is, typical pricing/tiers, key features, main integrations, and "
+        "security/compliance posture. Use well-known public information; if unsure of exact "
+        "figures give realistic typical ranges and note they are approximate."
+    )
+    parts.append('Return JSON: {"vendors": [{"name": "<product name>", "info": "<4-7 sentence brief>"}]}')
+    user = "\n\n".join(parts)
+
+    for model in (f"{_MODEL}:online", _MODEL):   # web-search-enabled first, then plain
+        try:
+            resp = _client().chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=1300,
+                temperature=0.3,
+            )
+            data = json.loads(resp.choices[0].message.content)
+            out: List[dict] = []
+            seen: set = set()
+            for v in data.get("vendors", []):
+                name = str(v.get("name", "")).strip()
+                info = str(v.get("info", "")).strip()
+                if name and name.lower() not in seen:
+                    seen.add(name.lower())
+                    out.append({"name": name, "info": info})
+                if len(out) >= count:
+                    break
+            if out:
+                return out
+        except Exception:
+            continue
+    return []
 
 
 def _dedupe_agents(selected: Optional[List[str]]) -> List[str]:

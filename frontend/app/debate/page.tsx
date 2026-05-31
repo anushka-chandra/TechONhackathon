@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
-  Brain, ChevronDown,
+  Brain, ChevronDown, AlertTriangle, Trash2, Pencil, Check, Plus,
 } from 'lucide-react'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -54,6 +54,15 @@ function deriveVendors(text: string): string[] {
   return uniq
 }
 
+// One uploaded document, with the backend's vendor/noise classification
+interface DocItem {
+  name: string
+  content: string
+  chars?: number
+  is_vendor?: boolean   // false → flagged as likely-not-a-vendor noise
+  reason?: string
+}
+
 // The exact context the backend forwards to every agent
 interface ContextInputs {
   requirements: string
@@ -61,6 +70,7 @@ interface ContextInputs {
   vendor_text: string
   has_documents: boolean
   suggested_vendors?: string[]   // real vendors detected from the uploaded PDFs
+  documents?: DocItem[]          // per-file content + classification
 }
 
 // Split combined vendor text (stored with "=== Document: name ===" headers) into docs
@@ -149,6 +159,10 @@ function DebateContent() {
   const [vendors, setVendors] = useState<string[]>(() => deriveVendors(requirements))
   const [vendorsInput, setVendorsInput] = useState(() => deriveVendors(requirements).join(', '))
 
+  // Editable Step 1 requirements (user can add missing requirements before the debate)
+  const [requirementsText, setRequirementsText] = useState(requirements)
+  const [editingReqs, setEditingReqs] = useState(false)
+
   const [data, setData] = useState<DebateResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -186,7 +200,7 @@ function DebateContent() {
     setLoading(true); setError(null); setData(null); setDone(false); setRevealed(0)
     try {
       const body: Record<string, unknown> = {
-        target: requirements || 'Procurement decision',
+        target: requirementsText || 'Procurement decision',
         users: 100,
         budget: 30000,
         vendors: vendorList,
@@ -215,7 +229,7 @@ function DebateContent() {
     setLoadingContext(true); setContextError(null)
     try {
       const body: Record<string, unknown> = {
-        target: requirements || 'Procurement decision',
+        target: requirementsText || 'Procurement decision',
         users: 100, budget: 30000, vendors,
       }
       if (agents.length) body.selected_agents = agents
@@ -249,6 +263,19 @@ function DebateContent() {
     setShowContext(false)   // collapse the context panel while the debate plays
     setStarted(true)
     runDebate(vendors)
+  }
+
+  // Remove a flagged (non-vendor) document, then re-read context & vendors
+  async function deleteDocument(name: string) {
+    if (!sessionId) return
+    try {
+      await fetch(`/api/py/sessions/${sessionId}/remove-document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: name }),
+      })
+    } catch { /* ignore — refresh will reflect current state */ }
+    fetchContext()
   }
 
   // ── Animate the reveal whenever new data arrives ───────────────────────────────
@@ -295,7 +322,7 @@ function DebateContent() {
 
   function handleRerun() {
     const parsed = vendorsInput.split(',').map(v => v.trim()).filter(Boolean).slice(0, 4)
-    const finalVendors = parsed.length >= 2 ? parsed : deriveVendors(requirements)
+    const finalVendors = parsed.length >= 2 ? parsed : deriveVendors(requirementsText)
     setVendors(finalVendors)
     setStarted(true)
     runDebate(finalVendors)
@@ -314,8 +341,10 @@ function DebateContent() {
   }))
   const maxSupport = Math.max(1, ...vendorSupport.map(s => s.count))
 
-  // Documents read from Step 3 (parsed from the combined vendor text)
-  const docs = parseDocuments(context?.vendor_text ?? '')
+  // Documents read from Step 3 — prefer the backend's classified list
+  const docs: DocItem[] = context?.documents
+    ?? parseDocuments(context?.vendor_text ?? '').map(d => ({ ...d, is_vendor: true }))
+  const flaggedCount = docs.filter(d => d.is_vendor === false).length
 
   // ── Context loading / error (before the user starts) ───────────────────────────
   if (loadingContext) {
@@ -394,20 +423,49 @@ function DebateContent() {
 
       {showContext && (
         <div className="px-4 pb-4 space-y-4" style={{ borderTop: '1px solid #21262d' }}>
-          {/* Step 1 */}
+          {/* Step 1 — editable requirements */}
           <div className="pt-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: '#8b949e' }}>
-              Step 1 — Requirements (forwarded to every agent)
-            </p>
-            <p className="text-sm rounded-lg p-3" style={{ background: '#0d1117', border: '1px solid #21262d', color: '#c9d1d9' }}>
-              {context.requirements || '—'}
-            </p>
+            <div className="flex items-center gap-2 mb-1.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: '#8b949e' }}>
+                Step 1 — Requirements (forwarded to every agent)
+              </p>
+              <button onClick={() => setEditingReqs(v => !v)}
+                className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold"
+                style={{ background: editingReqs ? 'rgba(63,185,80,0.15)' : 'rgba(88,166,255,0.12)', color: editingReqs ? '#3fb950' : '#58a6ff' }}>
+                {editingReqs ? <><Check className="w-3 h-3" /> Done</> : <><Pencil className="w-3 h-3" /> Edit</>}
+              </button>
+            </div>
+
+            {editingReqs ? (
+              <>
+                <textarea
+                  value={requirementsText}
+                  onChange={e => setRequirementsText(e.target.value)}
+                  rows={6}
+                  placeholder="Describe the requirements the board must discuss…"
+                  className="w-full text-sm rounded-lg p-3 outline-none resize-y"
+                  style={{ background: '#0d1117', border: '1px solid #388bfd', color: '#e6edf3' }}
+                />
+                <p className="text-[11px] mt-1.5 flex items-center gap-1" style={{ color: '#8b949e' }}>
+                  <Plus className="w-3 h-3" /> Add any missing requirements (budget, must-have features,
+                  compliance, integrations) — the agents will debate exactly this text.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm rounded-lg p-3 whitespace-pre-wrap"
+                style={{ background: '#0d1117', border: '1px solid #21262d', color: requirementsText ? '#c9d1d9' : '#6b7280' }}>
+                {requirementsText || 'No requirements provided yet — click Edit to add them.'}
+              </p>
+            )}
           </div>
 
           {/* Step 3 documents */}
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: '#8b949e' }}>
               Step 3 — Document text read ({docs.length})
+              {flaggedCount > 0 && (
+                <span style={{ color: '#f85149' }}> · {flaggedCount} flagged as non-vendor</span>
+              )}
             </p>
             {docs.length === 0 ? (
               <p className="text-sm rounded-lg p-3" style={{ background: '#0d1117', border: '1px dashed #30363d', color: '#8b949e' }}>
@@ -415,21 +473,49 @@ function DebateContent() {
               </p>
             ) : (
               <div className="space-y-2">
-                {docs.map((d, i) => (
-                  <div key={i} className="rounded-lg overflow-hidden" style={{ border: '1px solid #21262d' }}>
-                    <div className="flex items-center gap-2 px-3 py-1.5" style={{ background: '#0d1117' }}>
-                      <FileText className="w-3.5 h-3.5 shrink-0" style={{ color: '#a371f7' }} />
-                      <span className="text-xs font-semibold truncate" style={{ color: '#e6edf3' }}>{d.name}</span>
-                      <span className="text-[10px] ml-auto shrink-0" style={{ color: '#6b7280' }}>
-                        {d.content.length.toLocaleString()} chars
-                      </span>
+                {docs.map((d, i) => {
+                  const noise = d.is_vendor === false
+                  return (
+                    <div key={i} className="rounded-lg overflow-hidden"
+                      style={{ border: `1px solid ${noise ? 'rgba(248,81,73,0.55)' : '#21262d'}` }}>
+                      <div className="flex items-center gap-2 px-3 py-1.5"
+                        style={{ background: noise ? 'rgba(248,81,73,0.12)' : '#0d1117' }}>
+                        <FileText className="w-3.5 h-3.5 shrink-0" style={{ color: noise ? '#f85149' : '#a371f7' }} />
+                        <span className="text-xs font-semibold truncate" style={{ color: noise ? '#f85149' : '#e6edf3' }}>
+                          {d.name}
+                        </span>
+                        <span className="text-[10px] ml-auto shrink-0" style={{ color: '#6b7280' }}>
+                          {(d.chars ?? d.content.length).toLocaleString()} chars
+                        </span>
+                      </div>
+
+                      {noise && (
+                        <div className="flex items-start gap-2 px-3 py-2"
+                          style={{ background: 'rgba(248,81,73,0.08)', borderTop: '1px solid rgba(248,81,73,0.3)' }}>
+                          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#f85149' }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold" style={{ color: '#f85149' }}>
+                              Likely not a vendor document
+                            </p>
+                            <p className="text-[11px]" style={{ color: '#c9d1d9' }}>
+                              {d.reason || 'This file does not appear to describe a vendor or product offer.'} It will skew the debate — consider removing it.
+                            </p>
+                          </div>
+                          <button onClick={() => deleteDocument(d.name)} title="Remove this file"
+                            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold"
+                            style={{ background: 'rgba(248,81,73,0.18)', color: '#f85149' }}>
+                            <Trash2 className="w-3 h-3" /> Delete
+                          </button>
+                        </div>
+                      )}
+
+                      <pre className="text-xs whitespace-pre-wrap px-3 py-2 m-0 overflow-y-auto"
+                        style={{ maxHeight: 160, background: '#0d1117', color: '#9ca3af', fontFamily: 'inherit' }}>
+                        {d.content || '(no extractable text found in this file)'}
+                      </pre>
                     </div>
-                    <pre className="text-xs whitespace-pre-wrap px-3 py-2 m-0 overflow-y-auto"
-                      style={{ maxHeight: 160, background: '#0d1117', color: '#9ca3af', fontFamily: 'inherit' }}>
-                      {d.content || '(no extractable text found in this file)'}
-                    </pre>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -441,7 +527,7 @@ function DebateContent() {
             </summary>
             <pre className="text-xs whitespace-pre-wrap mt-2 rounded-lg p-3"
               style={{ background: '#0d1117', border: '1px solid #21262d', color: '#9ca3af', fontFamily: 'inherit' }}>
-              {context.brief}
+              {`Requirements: ${requirementsText || 'Procurement decision'}\nVendors under consideration: ${vendors.join(', ')}`}
             </pre>
           </details>
 
@@ -512,7 +598,7 @@ function DebateContent() {
               The motion before the board
             </p>
             <p className="text-sm" style={{ color: '#c9d1d9' }}>
-              {requirements || 'Procurement decision'}
+              {requirementsText || 'Procurement decision'}
             </p>
             <p className="text-xs mt-2" style={{ color: '#8b949e' }}>
               Evaluating <b style={{ color: '#e6edf3' }}>{vendors.join(' vs ')}</b>
@@ -834,7 +920,7 @@ function DebateContent() {
                 <section className="report-section">
                   <h2 className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#6b7280' }}>Requirement</h2>
                   <p className="text-sm rounded-lg p-3" style={{ background: '#f8fafc', border: '1px solid #e5e7eb', color: '#374151' }}>
-                    {requirements || 'Procurement decision'}
+                    {requirementsText || 'Procurement decision'}
                   </p>
                 </section>
 
