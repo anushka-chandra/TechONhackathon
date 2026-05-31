@@ -1,0 +1,13 @@
+# Keep the backend image small — exclude the frontend and local cruft
+frontend/
+node_modules/
+.next/
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+*.env
+backend/data/
+.DS_Store

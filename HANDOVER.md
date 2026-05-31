@@ -258,3 +258,34 @@ When you make new changes, update this section (and the rest of this file) accor
 - Unify Debate/Dashboard backgrounds for full light-mode coverage.
 - Capture real user-count/budget in Step 1 (currently the brief only carries requirements + vendors).
 - Persist projects server-side (currently localStorage only).
+
+---
+
+## 13. Deployment (Railway backend + Vercel frontend)
+
+Set up for: **backend → Railway (Docker)**, **frontend → Vercel**.
+
+Files added for deploy:
+- `Dockerfile` (repo root) — `python:3.9-slim`, installs `requirements.txt`, copies only
+  `ui/ backend/ multi_agent_system/`, runs `uvicorn ui.server:app --host 0.0.0.0 --port ${PORT:-8000}`
+  (Railway injects `$PORT`). `.dockerignore` excludes the frontend & cruft.
+- `.env.example` (root, committed via a `!.env.example` gitignore exception) — the platform vars.
+- `ui/__init__.py` + `multi_agent_system/__init__.py` added so the packages import reliably in-container.
+
+Backend env/persistence:
+- `backend/database/engine.py` reads `DATABASE_URL` (default local sqlite) and now creates the
+  SQLite file's parent dir for ANY sqlite URL → works with a Railway **Volume**.
+- For persistence: attach a Railway Volume mounted at `/data` and set
+  `DATABASE_URL=sqlite:////data/nexus.db`. (Uploaded raw files in `backend/data/uploads` are
+  ephemeral, but the extracted vendor TEXT lives in the DB, so debates still work after redeploys.)
+
+Frontend proxy:
+- `frontend/app/api/py/[...path]/route.ts` now targets
+  `NEXT_PUBLIC_BACKEND_URL` (→ `BACKEND_URL` → `http://localhost:8000`), read at request time,
+  trailing slash stripped. Set `NEXT_PUBLIC_BACKEND_URL` on Vercel to the live Railway URL.
+
+Railway dashboard env: `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `AGENT_MODEL`,
+`DATABASE_URL=sqlite:////data/nexus.db` (+ Volume at `/data`).
+Vercel dashboard env: `NEXT_PUBLIC_BACKEND_URL=https://<railway-app>.up.railway.app`,
+Root Directory = `frontend`.
+Open the **Vercel** URL as the live app.

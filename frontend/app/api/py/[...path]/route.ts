@@ -3,11 +3,15 @@ import { NextRequest, NextResponse } from 'next/server'
 // Same-origin proxy to the FastAPI backend.
 // The browser only ever talks to the Next.js server (this route), which forwards
 // the request to FastAPI server-side. This makes the app work from any machine,
-// not just one where the backend is reachable at the browser's own localhost.
-const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:8000'
+// and in production targets the live backend via NEXT_PUBLIC_BACKEND_URL.
+// Read at request time (not module load) so the deployed env var is always honoured.
+function backendBase(): string {
+  const raw = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8000'
+  return raw.replace(/\/+$/, '') // strip any trailing slash to avoid '//api/...'
+}
 
 async function forward(req: NextRequest, path: string[]) {
-  const target = `${BACKEND}/api/${path.join('/')}${req.nextUrl.search}`
+  const target = `${backendBase()}/api/${path.join('/')}${req.nextUrl.search}`
 
   const headers: Record<string, string> = {}
   const contentType = req.headers.get('content-type')
@@ -28,7 +32,7 @@ async function forward(req: NextRequest, path: string[]) {
     })
   } catch (e) {
     return NextResponse.json(
-      { error: `Backend unreachable at ${BACKEND}`, detail: e instanceof Error ? e.message : String(e) },
+      { error: `Backend unreachable at ${backendBase()}`, detail: e instanceof Error ? e.message : String(e) },
       { status: 502 },
     )
   }

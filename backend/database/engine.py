@@ -14,9 +14,19 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 # ── Path ───────────────────────────────────────────────────────────────────────
 _HERE = Path(__file__).resolve().parent.parent   # backend/
 DB_PATH = _HERE / "data" / "nexus.db"
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+# DATABASE_URL wins (e.g. a Railway volume: sqlite:////data/nexus.db, or Postgres);
+# otherwise default to the local file. Either way, make sure the SQLite file's
+# parent directory exists so the very first request can create the DB.
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+
+if DATABASE_URL.startswith("sqlite"):
+    _file = DATABASE_URL.split("sqlite:///", 1)[-1]
+    if _file and _file != ":memory:":
+        try:
+            Path(_file).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
 # ── Engine ─────────────────────────────────────────────────────────────────────
 # check_same_thread=False is required for SQLite when used with FastAPI
