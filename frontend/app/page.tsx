@@ -142,14 +142,14 @@ export default function LandingPage() {
 
     // ② Create backend session & save step 1 (logs to FastAPI so we can verify)
     try {
-      const sessionRes = await fetch('http://localhost:8000/api/sessions', {
+      const sessionRes = await fetch('/api/py/sessions', {
         method: 'POST',
       })
       if (sessionRes.ok) {
         const { session_id } = await sessionRes.json()
         setSessionId(session_id)
         updateChat(chatId, { sessionId: session_id })   // link entry → backend session
-        await fetch(`http://localhost:8000/api/sessions/${session_id}/step1`, {
+        await fetch(`/api/py/sessions/${session_id}/step1`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text, summary: localSummary(text) }),
@@ -184,7 +184,7 @@ export default function LandingPage() {
     setTimeout(() => setStep(3), 200)
     // Save step 2 to backend
     if (sessionId) {
-      fetch(`http://localhost:8000/api/sessions/${sessionId}/step2`, {
+      fetch(`/api/py/sessions/${sessionId}/step2`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agents: Array.from(selectedAgents) }),
@@ -219,7 +219,7 @@ export default function LandingPage() {
   function handleVendorChoice(choice: 'upload' | 'search') {
     setActionLoading(choice)
     if (sessionId) {
-      fetch(`http://localhost:8000/api/sessions/${sessionId}/step3`, {
+      fetch(`/api/py/sessions/${sessionId}/step3`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: choice }),
@@ -237,7 +237,7 @@ export default function LandingPage() {
     if (sessionId) {
       try {
         // Record the chosen method
-        await fetch(`http://localhost:8000/api/sessions/${sessionId}/step3`, {
+        await fetch(`/api/py/sessions/${sessionId}/step3`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ method: 'upload' }),
@@ -245,7 +245,7 @@ export default function LandingPage() {
         // Upload every selected file in one request — backend extracts & combines text
         const fd = new FormData()
         Array.from(files).forEach(f => fd.append('files', f))
-        await fetch(`http://localhost:8000/api/upload/${sessionId}`, {
+        await fetch(`/api/py/upload/${sessionId}`, {
           method: 'POST',
           body: fd,   // NOTE: no Content-Type header — browser sets the multipart boundary
         })

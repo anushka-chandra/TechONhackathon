@@ -27,6 +27,43 @@ PHASES: list[tuple[str, str]] = [
 ]
 
 
+def extract_vendor_names(text: str, max_vendors: int = 5) -> List[str]:
+    """
+    Identify the distinct vendors/products actually being proposed in the
+    uploaded documents. Irrelevant files (e.g. a recipe) are excluded.
+    Uses one cheap LLM call; returns [] on any failure.
+    """
+    if not text.strip():
+        return []
+    try:
+        resp = _client().chat.completions.create(
+            model=_MODEL,
+            messages=[
+                {"role": "system", "content":
+                    "You identify the distinct software vendors or products being proposed in "
+                    "procurement documents. Ignore any document that is NOT a vendor proposal "
+                    "(recipes, unrelated notes, etc.)."},
+                {"role": "user", "content":
+                    "From the following documents, list ONLY the distinct vendor/product names that "
+                    "are genuine procurement options to compare. Use the real product name where given.\n\n"
+                    f"{text[:8000]}\n\n"
+                    'Return JSON: {"vendors": ["name1", "name2"]}'},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=150,
+            temperature=0,
+        )
+        data = json.loads(resp.choices[0].message.content)
+        seen: list[str] = []
+        for v in data.get("vendors", []):
+            name = str(v).strip()
+            if name and name not in seen:
+                seen.append(name)
+        return seen[:max_vendors]
+    except Exception:
+        return []
+
+
 def _dedupe_agents(selected: Optional[List[str]]) -> List[str]:
     ids = selected or ALL_AGENTS
     seen: list[str] = []

@@ -221,7 +221,7 @@ function DashboardContent() {
       if (paramSessionId) {
         body.session_id = paramSessionId
       }
-      const res = await fetch('http://localhost:8000/api/simulate', {
+      const res = await fetch('/api/py/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

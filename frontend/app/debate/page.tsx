@@ -54,6 +54,27 @@ function deriveVendors(text: string): string[] {
   return uniq
 }
 
+// The exact context the backend forwards to every agent
+interface ContextInputs {
+  requirements: string
+  brief: string
+  vendor_text: string
+  has_documents: boolean
+  suggested_vendors?: string[]   // real vendors detected from the uploaded PDFs
+}
+
+// Split combined vendor text (stored with "=== Document: name ===" headers) into docs
+function parseDocuments(vendorText: string): { name: string; content: string }[] {
+  if (!vendorText.trim()) return []
+  const parts = vendorText.split(/=== Document: (.+?) ===\n?/g)
+  const docs: { name: string; content: string }[] = []
+  for (let i = 1; i < parts.length; i += 2) {
+    docs.push({ name: parts[i].trim(), content: (parts[i + 1] ?? '').trim() })
+  }
+  if (docs.length === 0) docs.push({ name: 'Document', content: vendorText.trim() })
+  return docs
+}
+
 // ── Chart primitives (inline SVG/CSS — print-safe, no extra deps) ────────────────
 function Donut({
   value, size = 110, stroke = 11, color = '#16a34a', track = '#e5e7eb', textColor = '#111827',
@@ -129,8 +150,15 @@ function DebateContent() {
   const [vendorsInput, setVendorsInput] = useState(() => deriveVendors(requirements).join(', '))
 
   const [data, setData] = useState<DebateResult | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Pre-debate context review
+  const [context, setContext] = useState<ContextInputs | null>(null)
+  const [loadingContext, setLoadingContext] = useState(true)
+  const [contextError, setContextError] = useState<string | null>(null)
+  const [started, setStarted] = useState(false)
+  const [showContext, setShowContext] = useState(true)
 
   const [revealed, setRevealed] = useState(0)
   const [typing, setTyping] = useState(false)
@@ -166,7 +194,7 @@ function DebateContent() {
       if (agents.length) body.selected_agents = agents
       if (sessionId) body.session_id = sessionId
 
-      const res = await fetch('http://localhost:8000/api/debate', {
+      const res = await fetch('/api/py/debate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -182,8 +210,46 @@ function DebateContent() {
     }
   }
 
-  // Run once on mount
-  useEffect(() => { runDebate(vendors) /* eslint-disable-next-line */ }, [])
+  // ── Fetch the pre-debate context (cheap; no LLM calls) ─────────────────────────
+  async function fetchContext() {
+    setLoadingContext(true); setContextError(null)
+    try {
+      const body: Record<string, unknown> = {
+        target: requirements || 'Procurement decision',
+        users: 100, budget: 30000, vendors,
+      }
+      if (agents.length) body.selected_agents = agents
+      if (sessionId) body.session_id = sessionId
+      const res = await fetch('/api/py/context', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error(`API error: ${res.status}`)
+      const ctx: ContextInputs = await res.json()
+      setContext(ctx)
+      // Adopt the real vendors detected from the uploaded documents
+      if (Array.isArray(ctx.suggested_vendors) && ctx.suggested_vendors.length >= 2) {
+        const detected = ctx.suggested_vendors.slice(0, 4)
+        setVendors(detected)
+        setVendorsInput(detected.join(', '))
+      }
+    } catch (e: unknown) {
+      setContextError(
+        `Could not reach the FastAPI backend on port 8000.\n${e instanceof Error ? e.message : ''}`,
+      )
+    } finally {
+      setLoadingContext(false)
+    }
+  }
+
+  // Load context on mount; the debate runs only after the user reviews & clicks Start
+  useEffect(() => { fetchContext() /* eslint-disable-next-line */ }, [])
+
+  function handleStart() {
+    setShowContext(false)   // collapse the context panel while the debate plays
+    setStarted(true)
+    runDebate(vendors)
+  }
 
   // ── Animate the reveal whenever new data arrives ───────────────────────────────
   useEffect(() => {
@@ -228,9 +294,10 @@ function DebateContent() {
   }
 
   function handleRerun() {
-    const parsed = vendorsInput.split(',').map(v => v.trim()).filter(Boolean).slice(0, 2)
-    const finalVendors = parsed.length === 2 ? parsed : deriveVendors(requirements)
+    const parsed = vendorsInput.split(',').map(v => v.trim()).filter(Boolean).slice(0, 4)
+    const finalVendors = parsed.length >= 2 ? parsed : deriveVendors(requirements)
     setVendors(finalVendors)
+    setStarted(true)
     runDebate(finalVendors)
   }
 
@@ -247,7 +314,35 @@ function DebateContent() {
   }))
   const maxSupport = Math.max(1, ...vendorSupport.map(s => s.count))
 
-  // ── Loading state ──────────────────────────────────────────────────────────────
+  // Documents read from Step 3 (parsed from the combined vendor text)
+  const docs = parseDocuments(context?.vendor_text ?? '')
+
+  // ── Context loading / error (before the user starts) ───────────────────────────
+  if (loadingContext) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: '#0d1117' }}>
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#58a6ff' }} />
+        <p className="text-sm" style={{ color: '#8b949e' }}>Reading your Step 1 &amp; Step 3 inputs…</p>
+      </main>
+    )
+  }
+  if (contextError && !context) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-4 px-6" style={{ background: '#0d1117' }}>
+        <p className="text-sm whitespace-pre-wrap text-center max-w-md rounded-lg p-4"
+          style={{ background: '#4a1f1f', color: '#f85149', border: '1px solid rgba(248,81,73,.3)' }}>
+          {contextError}
+        </p>
+        <button onClick={fetchContext}
+          className="px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2"
+          style={{ background: '#238636', color: '#fff' }}>
+          <RefreshCw className="w-4 h-4" /> Retry
+        </button>
+      </main>
+    )
+  }
+
+  // ── Debate generation loader ───────────────────────────────────────────────────
   if (loading) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-5" style={{ background: '#0d1117' }}>
@@ -283,6 +378,82 @@ function DebateContent() {
     )
   }
 
+  // ── Context card: the exact inputs forwarded to the agents ─────────────────────
+  const contextCard = context && (
+    <div className="rounded-xl border mb-6" style={{ background: '#161b22', borderColor: '#30363d' }}>
+      <button onClick={() => setShowContext(v => !v)} aria-expanded={showContext}
+        className="w-full flex items-center gap-2 px-4 py-3">
+        <FileText className="w-4 h-4 shrink-0" style={{ color: '#58a6ff' }} />
+        <span className="text-sm font-semibold" style={{ color: '#e6edf3' }}>Context fed to the board</span>
+        <span className="hidden sm:inline text-xs" style={{ color: '#8b949e' }}>
+          Step 1 requirements · {docs.length} document{docs.length !== 1 ? 's' : ''} from Step 3
+        </span>
+        <ChevronDown className="w-4 h-4 ml-auto shrink-0"
+          style={{ color: '#8b949e', transition: 'transform .25s ease', transform: showContext ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+      </button>
+
+      {showContext && (
+        <div className="px-4 pb-4 space-y-4" style={{ borderTop: '1px solid #21262d' }}>
+          {/* Step 1 */}
+          <div className="pt-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: '#8b949e' }}>
+              Step 1 — Requirements (forwarded to every agent)
+            </p>
+            <p className="text-sm rounded-lg p-3" style={{ background: '#0d1117', border: '1px solid #21262d', color: '#c9d1d9' }}>
+              {context.requirements || '—'}
+            </p>
+          </div>
+
+          {/* Step 3 documents */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: '#8b949e' }}>
+              Step 3 — Document text read ({docs.length})
+            </p>
+            {docs.length === 0 ? (
+              <p className="text-sm rounded-lg p-3" style={{ background: '#0d1117', border: '1px dashed #30363d', color: '#8b949e' }}>
+                No documents uploaded — the agents rely on general market knowledge.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {docs.map((d, i) => (
+                  <div key={i} className="rounded-lg overflow-hidden" style={{ border: '1px solid #21262d' }}>
+                    <div className="flex items-center gap-2 px-3 py-1.5" style={{ background: '#0d1117' }}>
+                      <FileText className="w-3.5 h-3.5 shrink-0" style={{ color: '#a371f7' }} />
+                      <span className="text-xs font-semibold truncate" style={{ color: '#e6edf3' }}>{d.name}</span>
+                      <span className="text-[10px] ml-auto shrink-0" style={{ color: '#6b7280' }}>
+                        {d.content.length.toLocaleString()} chars
+                      </span>
+                    </div>
+                    <pre className="text-xs whitespace-pre-wrap px-3 py-2 m-0 overflow-y-auto"
+                      style={{ maxHeight: 160, background: '#0d1117', color: '#9ca3af', fontFamily: 'inherit' }}>
+                      {d.content || '(no extractable text found in this file)'}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Exact brief string */}
+          <details>
+            <summary className="text-xs cursor-pointer" style={{ color: '#58a6ff' }}>
+              View the exact brief string sent to each agent
+            </summary>
+            <pre className="text-xs whitespace-pre-wrap mt-2 rounded-lg p-3"
+              style={{ background: '#0d1117', border: '1px solid #21262d', color: '#9ca3af', fontFamily: 'inherit' }}>
+              {context.brief}
+            </pre>
+          </details>
+
+          <p className="text-[11px] leading-relaxed" style={{ color: '#6b7280' }}>
+            Every agent receives the same requirements and documents above, plus its own role lens
+            (CEO → strategy, CFO → 3-year TCO, CTO → integration, CSO → security, Procurement → pricing).
+          </p>
+        </div>
+      )}
+    </div>
+  )
+
   // ── Main ───────────────────────────────────────────────────────────────────────
   return (
     <main className="min-h-screen" style={{ background: '#0d1117' }}>
@@ -314,13 +485,14 @@ function DebateContent() {
             </button>
           </div>
 
-          {!done ? (
+          {started && !done && (
             <button onClick={handleSkip}
               className="px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5"
               style={{ background: '#21262d', color: '#c9d1d9' }}>
               <FastForward className="w-3.5 h-3.5" /> Skip
             </button>
-          ) : (
+          )}
+          {done && (
             <button onClick={() => setShowReport(true)}
               className="px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5"
               style={{ background: 'linear-gradient(135deg,#238636,#2ea043)', color: '#fff' }}>
@@ -349,6 +521,24 @@ function DebateContent() {
           </div>
         </div>
 
+        {/* Context the agents receive (Step 1 + Step 3) */}
+        {contextCard}
+
+        {/* Pre-debate gate: review inputs, then start */}
+        {!started && (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <button onClick={handleStart}
+              className="px-6 py-3.5 rounded-xl text-sm font-bold flex items-center gap-2"
+              style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff', boxShadow: '0 0 24px rgba(124,58,237,.35)' }}>
+              <Gavel className="w-4 h-4" /> Start the Debate
+            </button>
+            <p className="text-xs" style={{ color: '#8b949e' }}>
+              The board will deliberate over 3 rounds using the context above.
+            </p>
+          </div>
+        )}
+
+        {started && (<>
         {/* ── Final decision — surfaced on top once the board concludes ── */}
         {done && dec && (
           <div ref={decisionRef} className="turn-in space-y-6 mb-8">
@@ -533,6 +723,7 @@ function DebateContent() {
             </div>
           )}
         </section>
+        </>)}
 
         <div ref={bottomRef} />
       </div>

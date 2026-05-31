@@ -14,7 +14,7 @@ from backend.database import models as db_models
 from backend.database import crud
 from backend.pdf_extractor import extract_text
 from multi_agent_system.orchestrator import run_society
-from multi_agent_system.debate import run_debate
+from multi_agent_system.debate import run_debate, extract_vendor_names
 
 # ── Create / migrate DB on startup ────────────────────────────────────────────
 db_models.Base.metadata.create_all(bind=engine)
@@ -86,6 +86,73 @@ def simulate(req: SimulateRequest, db: DbSession = Depends(get_db)):
     return result
 
 
+def _build_brief(req: "SimulateRequest") -> str:
+    """
+    The exact procurement brief text forwarded to every agent.
+    Only contains what the user actually provided in Step 1 (requirements) and
+    the vendors under consideration — no fabricated user-count/budget figures.
+    """
+    return (
+        f"Requirements: {req.target}\n"
+        f"Vendors under consideration: {', '.join(req.vendors)}"
+    )
+
+
+def _session_vendor_text(req: "SimulateRequest", db: DbSession) -> str:
+    """Extracted PDF/document text stored for the session (Step 3), if any."""
+    if req.session_id:
+        session = crud.get_session(db, req.session_id)
+        if session and session.step3 and session.step3.vendor_text:
+            return session.step3.vendor_text
+    return ""
+
+
+def _stored_vendor_names(req: "SimulateRequest", db: DbSession) -> List[str]:
+    """Vendor names detected from the uploaded documents (Step 3), if any."""
+    if req.session_id:
+        session = crud.get_session(db, req.session_id)
+        if session and session.step3 and session.step3.vendor_names:
+            return session.step3.vendor_names
+    return []
+
+
+def _is_generic(vendors: List[str]) -> bool:
+    """True if vendors are placeholder names (no real selection was made)."""
+    return all(v.strip().lower().startswith("option") for v in vendors) if vendors else True
+
+
+def _resolve_vendors(req: "SimulateRequest", db: DbSession, vendor_text: str) -> List[str]:
+    """
+    Prefer real vendors detected from the uploaded documents over placeholder
+    ('Option A/B') names that the UI guesses when Step 1 has no vendor names.
+    """
+    stored = _stored_vendor_names(req, db)
+    if not stored and vendor_text.strip():
+        stored = extract_vendor_names(vendor_text)
+    if stored and (_is_generic(req.vendors) or len(req.vendors) < 2):
+        return stored
+    return req.vendors
+
+
+@app.post("/api/context")
+def context(req: SimulateRequest, db: DbSession = Depends(get_db)):
+    """
+    Return the exact context that WILL be forwarded to the agents — the
+    Step 1 brief and the Step 3 document text — WITHOUT running the debate.
+    Lets the UI show the user what was read before spending a debate run.
+    """
+    vendor_text = _session_vendor_text(req, db)
+    suggested = _resolve_vendors(req, db, vendor_text)
+    req.vendors = suggested   # brief should reflect the real vendors
+    return {
+        "requirements":     req.target,
+        "brief":            _build_brief(req),
+        "vendor_text":      vendor_text,
+        "has_documents":    bool(vendor_text.strip()),
+        "suggested_vendors": suggested,
+    }
+
+
 @app.post("/api/debate")
 def debate(req: SimulateRequest, db: DbSession = Depends(get_db)):
     """
@@ -93,25 +160,24 @@ def debate(req: SimulateRequest, db: DbSession = Depends(get_db)):
     return the full transcript plus the moderator's synthesised decision.
     Same inputs as /api/simulate — pulls vendor_text from the session's PDF.
     """
-    vendor_text = ""
-    if req.session_id:
-        session = crud.get_session(db, req.session_id)
-        if session and session.step3 and session.step3.vendor_text:
-            vendor_text = session.step3.vendor_text
+    vendor_text = _session_vendor_text(req, db)
+    req.vendors = _resolve_vendors(req, db, vendor_text)   # prefer real vendors from PDFs
+    brief = _build_brief(req)
 
-    brief = (
-        f"Category: {req.target}\n"
-        f"Number of users: {req.users}\n"
-        f"Annual budget: €{req.budget:,.0f}\n"
-        f"Vendors under consideration: {', '.join(req.vendors)}"
-    )
-
-    return run_debate(
+    result = run_debate(
         requirements=brief,
         vendor_info=vendor_text,
         selected_agents=req.selected_agents,
         vendors=req.vendors,
     )
+    # Echo back the exact inputs so the UI can show what the agents received
+    result["inputs"] = {
+        "requirements":  req.target,
+        "brief":         brief,
+        "vendor_text":   vendor_text,
+        "has_documents": bool(vendor_text.strip()),
+    }
+    return result
 
 
 # ── File upload endpoint ───────────────────────────────────────────────────────
@@ -167,10 +233,15 @@ async def upload_vendor_files(
         except Exception:
             pass
 
+    detected_vendors: List[str] = []
     if session.step3:
         existing = session.step3.vendor_text or ""
         merged = f"{existing}\n\n{combined}".strip() if existing else combined
         session.step3.vendor_text = merged[:MAX_VENDOR_TEXT]
+        # Detect the real vendors from all uploaded documents (ignores noise)
+        detected_vendors = extract_vendor_names(session.step3.vendor_text)
+        if detected_vendors:
+            session.step3.vendor_names = detected_vendors
         db.commit()
         total_chars = len(session.step3.vendor_text)
     else:
@@ -181,6 +252,7 @@ async def upload_vendor_files(
         "files":           saved_names,
         "count":           len(saved_names),
         "chars_extracted": total_chars,
+        "detected_vendors": detected_vendors,
         "preview":         combined[:300] + ("…" if len(combined) > 300 else ""),
     }
 
