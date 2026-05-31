@@ -139,7 +139,10 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
 - `debate.py` — the core: `run_debate(... agent_configs={id:config})` instantiates each agent with
   its company-set personality. `run_debate()` (3 rounds → moderator synth → **scoring drives winner**;
   the decision **confidence is now `compute_derived_confidence(scorecards, vote_yes, vote_total)`**,
-  i.e. an auditable formula, NOT the LLM's self-reported number),
+  i.e. an auditable formula, NOT the LLM's self-reported number; if EVERY vendor fails a hard
+  constraint, `decision.winner = "NONE"`, `confidence = 0`, and `decision.all_constraints_failed =
+  true` — no "least-bad" vendor is crowned. NOTE: the UI/report still render `winner` literally, so a
+  dedicated "no valid vendor" treatment is a TODO),
   `extract_vendor_names()` (cap 4, excludes noise), `detect_category()`, `classify_documents()`
   (vendor vs noise, any product type), `search_vendors()` (`:online` first, knowledge fallback,
   context_docs = good files only), `draft_negotiation_email()`.

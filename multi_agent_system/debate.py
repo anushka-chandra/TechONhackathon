@@ -456,12 +456,22 @@ def run_debate(
     # ── Quantitative scoring: mathematically-auditable compatibility matrix ──────
     transcript_text = "\n".join(f"{t['name']} ({t['phase']}): {t['message']}" for t in transcript)
     scorecards = score_all_vendors(vendor_list, requirements, vendor_info, transcript_text)
+    all_constraints_failed = False
     if scorecards:
         best_idx = max(range(len(scorecards)), key=lambda i: scorecards[i]["compatibility_score"])
         winner = vendor_list[best_idx]
         vote_yes = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") == "YES")
         vote_total = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") in ("YES", "NO"))
         confidence = compute_derived_confidence(scorecards, vote_yes, vote_total)
+
+        # If every single vendor failed at least one hard constraint, there is no
+        # valid winner. Signal this clearly instead of crowning the least-bad option.
+        all_constraints_failed = all(
+            not sc.get("hard_constraints_passed", False) for sc in scorecards
+        )
+        if all_constraints_failed:
+            winner = "NONE"
+            confidence = 0
 
     synth = _synthesize(requirements, vendor_list, transcript, winner, confidence)
 
@@ -475,14 +485,15 @@ def run_debate(
         "agents":   agents_meta,
         "rounds":   rounds,
         "decision": {
-            "winner":       winner,
-            "runner_up":    next((v for v in vendor_list if v != winner), ""),
-            "confidence":   confidence,
-            "vote_summary": {"yes": len(yes_votes), "no": len(no_votes), "total": len(closing)},
-            "summary":      synth["summary"],
-            "justification": synth["justification"],
-            "pros":         synth["pros"],
-            "cons":         synth["cons"],
+            "winner":                winner,
+            "runner_up":             next((v for v in vendor_list if v != winner), ""),
+            "confidence":            confidence,
+            "all_constraints_failed": all_constraints_failed,
+            "vote_summary":          {"yes": len(yes_votes), "no": len(no_votes), "total": len(closing)},
+            "summary":               synth["summary"],
+            "justification":         synth["justification"],
+            "pros":                  synth["pros"],
+            "cons":                  synth["cons"],
         },
         "scorecards": scorecards,
         "decision_matrix": build_decision_matrix(scorecards),
