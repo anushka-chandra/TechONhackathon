@@ -20,6 +20,7 @@ interface Turn {
 interface Round { phase: string; label: string; turns: Turn[] }
 interface Decision {
   winner: string; runner_up: string; confidence: number
+  all_constraints_failed?: boolean
   vote_summary: { yes: number; no: number; total: number }
   summary: string; justification: string
   pros: Record<string, string[]>; cons: Record<string, string[]>
@@ -394,6 +395,8 @@ function DebateContent() {
   }
 
   const dec = data?.decision
+  // No vendor cleared every hard constraint → the board declines to recommend one.
+  const noWinner = !!dec && (dec.all_constraints_failed || dec.winner === 'NONE')
   const reportDate = new Date().toLocaleDateString('en-GB', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
@@ -677,26 +680,48 @@ function DebateContent() {
         {/* ── Final decision — surfaced on top once the board concludes ── */}
         {done && dec && (
           <div ref={decisionRef} className="turn-in space-y-6 mb-8">
-            {/* Winner banner */}
-            <div className="rounded-2xl border p-8 text-center"
-              style={{
-                background: 'linear-gradient(135deg,#1a3a1a,#0f2a0f)',
-                borderColor: '#3fb950', boxShadow: '0 0 40px rgba(63,185,80,.15)',
-              }}>
-              <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: '#3fb950' }}>
-                The board has reached a decision
-              </p>
-              <div className="flex items-center justify-center gap-3 mb-1">
-                <Trophy className="w-8 h-8" style={{ color: '#d29922' }} />
-                <h2 className="text-4xl font-black" style={{ color: '#3fb950' }}>{dec.winner}</h2>
+            {/* Winner banner — or a "no valid vendor" notice when every vendor fails a hard constraint */}
+            {noWinner ? (
+              <div className="rounded-2xl border p-8 text-center"
+                style={{
+                  background: 'linear-gradient(135deg,#3a1a1a,#2a0f0f)',
+                  borderColor: '#f85149', boxShadow: '0 0 40px rgba(248,81,73,.15)',
+                }}>
+                <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: '#f85149' }}>
+                  The board declines to recommend a vendor
+                </p>
+                <div className="flex items-center justify-center gap-3 mb-1">
+                  <AlertTriangle className="w-8 h-8" style={{ color: '#f85149' }} />
+                  <h2 className="text-3xl font-black" style={{ color: '#f85149' }}>No qualifying vendor</h2>
+                </div>
+                <p className="text-lg" style={{ color: '#ff8a80' }}>
+                  Every option failed at least one hard (mandatory) constraint
+                </p>
+                <p className="text-sm mt-3 max-w-2xl mx-auto" style={{ color: '#c9d1d9' }}>
+                  {dec.justification}
+                </p>
               </div>
-              <p className="text-lg" style={{ color: '#7ee787' }}>
-                {dec.confidence}% Confidence · {dec.vote_summary.yes}/{dec.vote_summary.total} in favor
-              </p>
-              <p className="text-sm mt-3 max-w-2xl mx-auto" style={{ color: '#c9d1d9' }}>
-                {dec.justification}
-              </p>
-            </div>
+            ) : (
+              <div className="rounded-2xl border p-8 text-center"
+                style={{
+                  background: 'linear-gradient(135deg,#1a3a1a,#0f2a0f)',
+                  borderColor: '#3fb950', boxShadow: '0 0 40px rgba(63,185,80,.15)',
+                }}>
+                <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: '#3fb950' }}>
+                  The board has reached a decision
+                </p>
+                <div className="flex items-center justify-center gap-3 mb-1">
+                  <Trophy className="w-8 h-8" style={{ color: '#d29922' }} />
+                  <h2 className="text-4xl font-black" style={{ color: '#3fb950' }}>{dec.winner}</h2>
+                </div>
+                <p className="text-lg" style={{ color: '#7ee787' }}>
+                  {dec.confidence}% Confidence · {dec.vote_summary.yes}/{dec.vote_summary.total} in favor
+                </p>
+                <p className="text-sm mt-3 max-w-2xl mx-auto" style={{ color: '#c9d1d9' }}>
+                  {dec.justification}
+                </p>
+              </div>
+            )}
 
             {/* Debate summary */}
             <div className="rounded-xl border p-6" style={{ background: '#161b22', borderColor: '#30363d' }}>
@@ -927,23 +952,34 @@ function DebateContent() {
 
               <div className="px-10 py-8 space-y-8">
 
-                {/* Decision hero */}
+                {/* Decision hero — green recommendation, or red "no qualifying vendor" notice */}
                 <section className="report-section rounded-xl p-6"
-                  style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                  <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#15803d' }}>
-                    Recommended Decision
+                  style={noWinner
+                    ? { background: '#fef2f2', border: '1px solid #fecaca' }
+                    : { background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: noWinner ? '#b91c1c' : '#15803d' }}>
+                    {noWinner ? 'No Recommended Vendor' : 'Recommended Decision'}
                   </p>
                   <div className="flex items-center gap-2 mb-2">
-                    <Trophy className="w-7 h-7" style={{ color: '#ca8a04' }} />
-                    <span className="text-3xl font-black" style={{ color: '#15803d' }}>{dec.winner}</span>
+                    {noWinner
+                      ? <AlertTriangle className="w-7 h-7" style={{ color: '#dc2626' }} />
+                      : <Trophy className="w-7 h-7" style={{ color: '#ca8a04' }} />}
+                    <span className="text-3xl font-black" style={{ color: noWinner ? '#b91c1c' : '#15803d' }}>
+                      {noWinner ? 'No qualifying vendor' : dec.winner}
+                    </span>
                   </div>
+                  {noWinner && (
+                    <p className="text-sm font-semibold mb-1" style={{ color: '#b91c1c' }}>
+                      Every option failed at least one hard (mandatory) constraint.
+                    </p>
+                  )}
                   <p className="text-sm leading-relaxed" style={{ color: '#374151' }}>{dec.justification}</p>
                   {/* Stat chips */}
                   <div className="grid grid-cols-3 gap-3 mt-4">
                     {[
                       { k: 'In Favor', v: `${dec.vote_summary.yes}/${dec.vote_summary.total}`, c: '#15803d' },
                       { k: 'Confidence', v: `${dec.confidence}%`, c: '#0369a1' },
-                      { k: 'Runner-up', v: dec.runner_up || '—', c: '#6b7280' },
+                      { k: noWinner ? 'Qualifying' : 'Runner-up', v: noWinner ? 'None' : (dec.runner_up || '—'), c: '#6b7280' },
                     ].map(s => (
                       <div key={s.k} className="rounded-lg px-3 py-2 text-center" style={{ background: '#fff', border: '1px solid #e5e7eb' }}>
                         <p className="text-[10px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>{s.k}</p>

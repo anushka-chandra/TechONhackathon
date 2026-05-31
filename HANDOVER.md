@@ -141,8 +141,9 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   the decision **confidence is now `compute_derived_confidence(scorecards, vote_yes, vote_total)`**,
   i.e. an auditable formula, NOT the LLM's self-reported number; if EVERY vendor fails a hard
   constraint, `decision.winner = "NONE"`, `confidence = 0`, and `decision.all_constraints_failed =
-  true` — no "least-bad" vendor is crowned. NOTE: the UI/report still render `winner` literally, so a
-  dedicated "no valid vendor" treatment is a TODO),
+  true` — no "least-bad" vendor is crowned. The frontend now reads `decision.all_constraints_failed`
+  and renders a dedicated red "No qualifying vendor" treatment (live summary banner + PDF/print report
+  hero) instead of a green `NONE 🏆` trophy — see `frontend/app/debate/page.tsx` (`noWinner` flag)),
   `extract_vendor_names()` (cap 4, excludes noise), `detect_category()`, `classify_documents()`
   (vendor vs noise, any product type), `search_vendors()` (`:online` first, knowledge fallback,
   context_docs = good files only), `draft_negotiation_email()`.
@@ -234,10 +235,12 @@ app shell share `--app-bg = #050505` (seamless, no border). Reusable keyframes: 
 
 ## 10. Current state (as of this handover)
 
-Latest pushed commit: `1e19663` (scoring hardening). **Uncommitted (built + verified, type-checks
-clean):** configurable agent personalities — Step 2 "Customize" panel → `step2.configs` →
-`BaseAgent(config=...)` → debate/scoring/report. All frontend work type-checks clean
-(`npx tsc --noEmit` from `frontend/`) and backend features were verified over HTTP/the proxy.
+Everything is committed/pushed to `main`. Most recent work: the frontend "no qualifying vendor"
+treatment — the debate page now renders a red `AlertTriangle` banner + red report hero when
+`decision.all_constraints_failed` (via the `noWinner` flag) instead of a green `NONE 🏆` trophy,
+finishing the NONE backend signal (`c6031e2`). `npx tsc --noEmit` from `frontend/` is clean. Couldn't
+live-verify the NONE path because the OpenRouter wallet is depleted (§11, 402s). Configurable agent
+personalities (`ab166d7`) and the NONE backend signal (`c6031e2`) are also on `main`.
 
 Feature inventory that exists today (all live on `main`):
 - **Landing** — Clarity hero (orb + neural net), opacity cross-fade into the wizard.
