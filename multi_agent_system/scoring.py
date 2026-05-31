@@ -119,30 +119,26 @@ def _normalise_card(raw: dict, vendor_name: str) -> dict:
 
 def _compute_score(card: dict) -> int:
     """
-    Deterministic, auditable compatibility score (0-100):
-      soft   = mandatory-weighted average of the requirements matrix (0-1)
-      persona= normalised average of the four persona scores (0-1)
-      base   = 0.5*soft + 0.5*persona
-      score  = round(base * hard_modifier * 100), hard_modifier = 1.0 (pass) or 0.25 (fail)
+    Compatibility score (0-100) using identical math to build_decision_matrix()
+    so the scorecard number and the matrix table always tell the same story.
+    Hard rows: binary — 1.0 if raw score >= 0.5, else 0.0
+    Soft rows: proportional partial credit, clamped 0.0-1.0
+    Weight: mandatory = 2, soft = 1
     """
     matrix = card.get("requirements_matrix", [])
-    if matrix:
-        num = den = 0.0
-        for m in matrix:
-            w = 2.0 if m.get("is_mandatory") else 1.0
-            num += w * float(m.get("score", 0.0))
-            den += w
-        soft = num / den if den else 0.5
-    else:
-        soft = 0.5
-
-    pvals = [p["score"] for p in card.get("persona_alignment", {}).values() if isinstance(p, dict)]
-    persona = (sum(pvals) / len(pvals) - 1) / 4 if pvals else 0.5
-    persona = max(0.0, min(1.0, persona))
-
-    base = 0.5 * soft + 0.5 * persona
-    hard_modifier = 1.0 if card.get("hard_constraints_passed", False) else 0.25
-    return round(base * hard_modifier * 100)
+    if not matrix:
+        return 0
+    total_weight = 0.0
+    weighted_sum = 0.0
+    for m in matrix:
+        w = 2.0 if m.get("is_mandatory") else 1.0
+        raw = float(m.get("score", 0.0))
+        value = (1.0 if raw >= 0.5 else 0.0) if m.get("is_mandatory") else max(0.0, min(1.0, raw))
+        weighted_sum += w * value
+        total_weight += w
+    if total_weight == 0:
+        return 0
+    return round((weighted_sum / total_weight) * 100)
 
 
 def _fallback_card(vendor_name: str) -> dict:

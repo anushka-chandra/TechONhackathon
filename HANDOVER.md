@@ -153,8 +153,17 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   top-vendor explanation). Included in `run_debate` result as `decision_matrix`. Also:
   `score_all_vendors()` / `score_vendor()`: per-vendor auditable scorecard
   (hard_constraints_passed, requirements_matrix 0–1, persona_alignment 1–5, analytical_summary) +
-  deterministic `compatibility_score` 0–100 = `(0.5*softMandatoryWeighted + 0.5*personaNorm) *
-  hardModifier(1.0 or 0.25) * 100`. The frontend What-If simulator mirrors this formula client-side.
+  deterministic `compatibility_score` 0–100. As of this session `_compute_score` uses the **same math
+  as `build_decision_matrix`** (hard rows binary 1.0/0.0 at the 0.5 threshold, soft rows proportional
+  0–1, weights hard=2/soft=1, normalised) — NO persona term, NO 0.25× modifier. So the scorecard
+  number, the matrix total, and the What-If base score now always agree; a vendor failing every hard
+  constraint (no soft credit) scores 0. (The old `(0.5*soft + 0.5*personaNorm)*hardMod` formula is
+  gone.) The frontend What-If simulator (`InteractiveSummaryPanel.recompute`) computes this same matrix
+  base, then adds a **persona bonus capped at +0.2** (`personaNorm*0.2`, total clamped ≤100) so the
+  persona sliders stay live/meaningful but can never lift an all-hard-failed (0) vendor above 20.
+  Separately, `DecisionMatrix` (and the debate-page banner) detect the "no viable vendor" case
+  (winner="NONE", or no vendor passes all mandatory rows) and show a red notice instead of crowning a
+  least-bad vendor.
   Scoring rigor: `SCORING_SYSTEM_PROMPT` starts with an **Evidence-First rule** (rule 0 — no
   evidence in `<vendor_data>` ⇒ soft score 0.0 / mandatory `hard_constraints_passed=false`; never
   infer features); `score_vendor` runs at **temperature=0** (deterministic) and feeds up to **10k**
@@ -235,12 +244,17 @@ app shell share `--app-bg = #050505` (seamless, no border). Reusable keyframes: 
 
 ## 10. Current state (as of this handover)
 
-Everything is committed/pushed to `main`. Most recent work: the frontend "no qualifying vendor"
-treatment — the debate page now renders a red `AlertTriangle` banner + red report hero when
-`decision.all_constraints_failed` (via the `noWinner` flag) instead of a green `NONE 🏆` trophy,
-finishing the NONE backend signal (`c6031e2`). `npx tsc --noEmit` from `frontend/` is clean. Couldn't
-live-verify the NONE path because the OpenRouter wallet is depleted (§11, 402s). Configurable agent
-personalities (`ab166d7`) and the NONE backend signal (`c6031e2`) are also on `main`.
+Everything is committed/pushed to `main`. Most recent work (this session):
+1. **"No qualifying vendor" treatment** — debate-page banner + PDF report hero turn red when
+   `decision.all_constraints_failed`/`winner="NONE"`, and `DecisionMatrix` shows a red "No viable
+   vendor" notice (and drops the trophy/ranking-winner styling) when no vendor passes all mandatory
+   rows — instead of a green `NONE 🏆` trophy / crowning a least-bad vendor.
+2. **Scoring alignment** — `_compute_score`, `build_decision_matrix`, and the What-If `recompute` now
+   use one weighted formula (see §6); a vendor failing every hard constraint scores 0, and the three
+   numbers agree. What-If persona sliders are live again as a capped +0–20 bonus on top of the matrix
+   base. Verified deterministically in Python (score == matrix total ×100) and `npx tsc --noEmit` clean.
+Couldn't live-verify the AI path because the OpenRouter wallet is depleted (§11, 402s). Configurable
+agent personalities (`ab166d7`) and the NONE backend signal (`c6031e2`) are also on `main`.
 
 Feature inventory that exists today (all live on `main`):
 - **Landing** — Clarity hero (orb + neural net), opacity cross-fade into the wizard.

@@ -680,25 +680,28 @@ function DebateContent() {
         {/* ── Final decision — surfaced on top once the board concludes ── */}
         {done && dec && (
           <div ref={decisionRef} className="turn-in space-y-6 mb-8">
-            {/* Winner banner — or a "no valid vendor" notice when every vendor fails a hard constraint */}
-            {noWinner ? (
+            {/* Winner banner */}
+            {dec.all_constraints_failed ? (
               <div className="rounded-2xl border p-8 text-center"
                 style={{
-                  background: 'linear-gradient(135deg,#3a1a1a,#2a0f0f)',
+                  background: 'linear-gradient(135deg,#2a1a1a,#1a0f0f)',
                   borderColor: '#f85149', boxShadow: '0 0 40px rgba(248,81,73,.15)',
                 }}>
                 <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: '#f85149' }}>
-                  The board declines to recommend a vendor
+                  No recommendation possible
                 </p>
                 <div className="flex items-center justify-center gap-3 mb-1">
-                  <AlertTriangle className="w-8 h-8" style={{ color: '#f85149' }} />
-                  <h2 className="text-3xl font-black" style={{ color: '#f85149' }}>No qualifying vendor</h2>
+                  <AlertTriangle className="w-8 h-8" style={{ color: '#d29922' }} />
+                  <h2 className="text-4xl font-black" style={{ color: '#f85149' }}>No Vendor Qualifies</h2>
                 </div>
-                <p className="text-lg" style={{ color: '#ff8a80' }}>
-                  Every option failed at least one hard (mandatory) constraint
+                <p className="text-lg" style={{ color: '#ffa198' }}>
+                  All vendors failed one or more hard constraints
                 </p>
                 <p className="text-sm mt-3 max-w-2xl mx-auto" style={{ color: '#c9d1d9' }}>
-                  {dec.justification}
+                  {dec.summary}
+                </p>
+                <p className="text-xs mt-4 max-w-xl mx-auto" style={{ color: '#8b949e' }}>
+                  Review your hard requirements or find vendors that meet your budget and feature constraints before proceeding.
                 </p>
               </div>
             ) : (

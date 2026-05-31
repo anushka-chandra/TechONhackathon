@@ -31,10 +31,23 @@ const DEFAULT_WEIGHTS: Record<Persona, number> = { CEO: 50, CTO: 50, CFO: 50, CS
 // the persona lenses are re-weighted live and the hard penalty is toggleable.
 function recompute(sc: Scorecard, weights: Record<Persona, number>, enforceHard: boolean) {
   const matrix = sc.requirements_matrix ?? []
-  let num = 0, den = 0
-  for (const m of matrix) { const w = m.is_mandatory ? 2 : 1; num += w * (m.score ?? 0); den += w }
-  const soft = den ? num / den : 0.5
+  if (!matrix.length) return 0
 
+  // Step 1: matrix score (same formula as backend build_decision_matrix)
+  let totalWeight = 0, weightedSum = 0
+  for (const m of matrix) {
+    const w = m.is_mandatory ? 2 : 1
+    const raw = m.score ?? 0
+    const value = (m.is_mandatory && enforceHard)
+      ? (raw >= 0.5 ? 1.0 : 0.0)
+      : Math.max(0, Math.min(1, raw))
+    weightedSum += w * value
+    totalWeight += w
+  }
+  const matrixScore = totalWeight === 0 ? 0 : weightedSum / totalWeight
+
+  // Step 2: persona alignment bonus (0.0 to 0.2 range, so sliders matter
+  // but cannot override hard requirement failures)
   let pnum = 0, pden = 0
   for (const p of PERSONAS) {
     const w = weights[p] ?? 0
@@ -42,11 +55,10 @@ function recompute(sc: Scorecard, weights: Record<Persona, number>, enforceHard:
     pnum += w * s; pden += w
   }
   const personaAvg = pden ? pnum / pden : 3
-  const persona = Math.max(0, Math.min(1, (personaAvg - 1) / 4))
+  const personaNorm = Math.max(0, Math.min(1, (personaAvg - 1) / 4))
+  const personaBonus = personaNorm * 0.2  // max 20 point bonus
 
-  const base = 0.5 * soft + 0.5 * persona
-  const hardMod = enforceHard && !sc.hard_constraints_passed ? 0.25 : 1
-  return Math.round(base * hardMod * 100)
+  return Math.min(100, Math.round((matrixScore + personaBonus) * 100))
 }
 
 const scoreColor = (s: number) => (s >= 60 ? '#3fb950' : s >= 35 ? '#d29922' : '#f85149')

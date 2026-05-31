@@ -2,7 +2,7 @@
 // Renders the backend-computed normalized matrix identically for the dark UI
 // and the light PDF report (variant="print"). No state, no interactivity.
 
-import { Grid3x3, Trophy } from 'lucide-react'
+import { AlertTriangle, Grid3x3, Trophy } from 'lucide-react'
 
 interface MatrixReq {
   name: string
@@ -25,6 +25,14 @@ export default function DecisionMatrix({
   if (!matrix || !matrix.requirements?.length) return null
   const { vendors, requirements, totals, ranking, explanation } = matrix
   const print = variant === 'print'
+
+  // A vendor "qualifies" only if it fails NO mandatory (hard) requirement.
+  // If no vendor qualifies (or the board returned winner="NONE"), there is no
+  // viable recommendation — the ranking is shown for transparency only and must
+  // NOT crown a "least-bad" winner.
+  const qualifies = (v: string) =>
+    requirements.every(r => !(r.mandatory && r.scores[v]?.failed))
+  const noViable = winner === 'NONE' || (vendors.length > 0 && !vendors.some(qualifies))
 
   // Palette per variant
   const c = print
@@ -122,6 +130,23 @@ export default function DecisionMatrix({
         </h3>
       </div>
 
+      {noViable && (
+        <div style={{
+          margin: print ? '0 0 8px' : '0 16px 12px',
+          padding: print ? '8px 10px' : '10px 12px',
+          borderRadius: 8,
+          background: print ? '#fef2f2' : 'rgba(248,81,73,.08)',
+          border: `1px solid ${print ? '#fecaca' : '#f85149'}`,
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <AlertTriangle style={{ width: print ? 12 : 16, height: print ? 12 : 16, color: c.fail, flexShrink: 0 }} />
+          <span style={{ fontSize: print ? 9 : 12, fontWeight: 700, color: c.fail }}>
+            No viable vendor — every option failed at least one hard constraint. The ranking below is shown for
+            transparency only; no vendor meets the mandatory requirements and none should be selected as-is.
+          </span>
+        </div>
+      )}
+
       <div style={print ? {} : { overflowX: 'auto', padding: '0 16px' }}>
         {table}
       </div>
@@ -129,20 +154,23 @@ export default function DecisionMatrix({
       {/* Ranking + explanation */}
       <div style={{ padding: print ? '8px 0 0' : '14px 16px 16px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: print ? 10 : 14, marginBottom: 8 }}>
-          {ranking.map((r, i) => (
-            <span key={r.vendor} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              fontSize: print ? 9 : 12, color: c.text, fontWeight: i === 0 ? 700 : 500,
-            }}>
-              {i === 0
-                ? <Trophy style={{ width: print ? 11 : 14, height: print ? 11 : 14, color: c.mand }} />
-                : <span style={{ color: c.dim }}>{i + 1}.</span>}
-              {r.vendor}
-              <span style={{ color: i === 0 ? c.good : c.dim, fontWeight: 700 }}>{r.total.toFixed(2)}</span>
-            </span>
-          ))}
+          {ranking.map((r, i) => {
+            const top = i === 0 && !noViable
+            return (
+              <span key={r.vendor} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: print ? 9 : 12, color: c.text, fontWeight: top ? 700 : 500,
+              }}>
+                {top
+                  ? <Trophy style={{ width: print ? 11 : 14, height: print ? 11 : 14, color: c.mand }} />
+                  : <span style={{ color: c.dim }}>{i + 1}.</span>}
+                {r.vendor}
+                <span style={{ color: top ? c.good : c.dim, fontWeight: 700 }}>{r.total.toFixed(2)}</span>
+              </span>
+            )
+          })}
         </div>
-        {explanation && (
+        {explanation && !noViable && (
           <p style={{ fontSize: print ? 9 : 12, lineHeight: 1.5, color: c.dim, margin: 0 }}>
             {explanation}
           </p>
