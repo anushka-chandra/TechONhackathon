@@ -17,6 +17,7 @@ from backend.pdf_extractor import extract_text
 from multi_agent_system.orchestrator import run_society
 from multi_agent_system.debate import (
     run_debate, extract_vendor_names, classify_documents, search_vendors, detect_category,
+    draft_negotiation_email,
 )
 
 # ── Create / migrate DB on startup ────────────────────────────────────────────
@@ -246,6 +247,49 @@ def debate(req: SimulateRequest, db: DbSession = Depends(get_db)):
         "has_documents": bool(vendor_text.strip()),
     }
     return result
+
+
+# ── Negotiation endpoint ───────────────────────────────────────────────────────
+
+class NegotiateBody(BaseModel):
+    winner:       str            = ""
+    vendors:      List[str]      = []
+    requirements: str            = ""
+
+
+@app.post("/api/negotiate/{session_id}")
+def negotiate(session_id: str, body: NegotiateBody, db: DbSession = Depends(get_db)):
+    """
+    Sales-negotiation agent: draft one email per vendor telling them a competitor
+    is currently ahead and inviting a revised offer (sent as a PDF). Looks up each
+    vendor's contact email via AI; if not found, the UI asks the user to enter it.
+    """
+    session = crud.get_session(db, session_id)
+    vendor_text = (session.step3.vendor_text if session and session.step3 else "") or ""
+
+    vendors = body.vendors or (session.step3.vendor_names if session and session.step3 else []) or []
+    vendors = vendors[:MAX_VENDORS]
+    if not vendors:
+        raise HTTPException(status_code=400, detail="No vendors to negotiate with")
+
+    winner = body.winner or vendors[0]
+    category = detect_category(vendor_text) if vendor_text.strip() else (body.requirements or "")
+
+    docs = parse_documents(vendor_text)
+
+    def _context_for(v: str) -> str:
+        for d in docs:
+            if v.lower() in d["name"].lower() or d["name"].lower() in v.lower():
+                return d["content"]
+        return ""
+
+    drafts = []
+    for v in vendors:
+        # Each vendor is told the strongest *other* option is ahead
+        better = winner if v != winner else next((x for x in vendors if x != v), winner)
+        drafts.append(draft_negotiation_email(v, better, category, _context_for(v)))
+
+    return {"category": category, "winner": winner, "drafts": drafts}
 
 
 # ── File upload endpoint ───────────────────────────────────────────────────────

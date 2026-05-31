@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
-  Brain, ChevronDown, AlertTriangle, Trash2, Pencil, Check, Plus,
+  Brain, ChevronDown, AlertTriangle, Trash2, Pencil, Check, Plus, Mail, Copy,
 } from 'lucide-react'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -61,6 +61,15 @@ interface DocItem {
   chars?: number
   is_vendor?: boolean   // false → flagged as likely-not-a-vendor noise
   reason?: string
+}
+
+// A negotiation email draft for one vendor
+interface NegoDraft {
+  vendor: string
+  email: string | null
+  email_found: boolean
+  subject: string
+  body: string
 }
 
 // The exact context the backend forwards to every agent
@@ -179,6 +188,13 @@ function DebateContent() {
   const [done, setDone] = useState(false)
   const [showReasoning, setShowReasoning] = useState(false)   // collapsed by default once done
   const [showReport, setShowReport] = useState(false)
+
+  // Negotiation emails
+  const [negoOpen, setNegoOpen] = useState(false)
+  const [negoLoading, setNegoLoading] = useState(false)
+  const [negoError, setNegoError] = useState<string | null>(null)
+  const [drafts, setDrafts] = useState<NegoDraft[]>([])
+
   const skipRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const decisionRef = useRef<HTMLDivElement>(null)
@@ -326,6 +342,40 @@ function DebateContent() {
     setVendors(finalVendors)
     setStarted(true)
     runDebate(finalVendors)
+  }
+
+  // ── Negotiation emails ─────────────────────────────────────────────────────────
+  async function openNegotiation() {
+    setNegoOpen(true); setNegoLoading(true); setNegoError(null); setDrafts([])
+    try {
+      const res = await fetch(`/api/py/negotiate/${sessionId || 'none'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          winner: dec?.winner ?? '',
+          vendors: data?.vendors ?? vendors,
+          requirements: requirementsText,
+        }),
+      })
+      if (!res.ok) throw new Error(`API error: ${res.status}`)
+      const d = await res.json()
+      setDrafts(Array.isArray(d.drafts) ? d.drafts : [])
+    } catch {
+      setNegoError('Could not draft the emails. Make sure the backend is running on port 8000.')
+    } finally {
+      setNegoLoading(false)
+    }
+  }
+
+  function updateDraft(i: number, patch: Partial<NegoDraft>) {
+    setDrafts(prev => prev.map((d, idx) => (idx === i ? { ...d, ...patch } : d)))
+  }
+
+  function mailtoHref(d: NegoDraft) {
+    const to = encodeURIComponent(d.email ?? '')
+    const subject = encodeURIComponent(d.subject)
+    const body = encodeURIComponent(d.body)
+    return `mailto:${to}?subject=${subject}&body=${body}`
   }
 
   const dec = data?.decision
@@ -686,11 +736,16 @@ function DebateContent() {
               ))}
             </div>
 
-            <div className="flex justify-center gap-3 pt-2">
+            <div className="flex justify-center flex-wrap gap-3 pt-2">
               <button onClick={() => setShowReport(true)}
                 className="px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-2"
                 style={{ background: 'linear-gradient(135deg,#238636,#2ea043)', color: '#fff' }}>
                 <Download className="w-4 h-4" /> Download Decision Report
+              </button>
+              <button onClick={openNegotiation}
+                className="px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-2"
+                style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff' }}>
+                <Mail className="w-4 h-4" /> Draft negotiation emails
               </button>
             </div>
           </div>
@@ -979,6 +1034,101 @@ function DebateContent() {
                   deliberation and is intended as supporting evidence for the procurement decision above.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Negotiation emails overlay ────────────────────────────────────────── */}
+      {negoOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="min-h-full py-8 px-4 flex justify-center">
+            <div className="w-full max-w-2xl rounded-2xl p-6"
+              style={{ background: '#161b22', border: '1px solid #30363d' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <Mail className="w-5 h-5" style={{ color: '#a371f7' }} />
+                <h2 className="text-lg font-bold" style={{ color: '#e6edf3' }}>Vendor negotiation emails</h2>
+                <button onClick={() => setNegoOpen(false)} className="ml-auto p-2 rounded-lg" style={{ color: '#8b949e' }}>
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-xs mb-5" style={{ color: '#8b949e' }}>
+                One draft per vendor — each is told a competitor is ahead and invited to send a better
+                offer as a PDF. Review, edit, and send. Verify each email address before sending.
+              </p>
+
+              {negoLoading && (
+                <div className="flex flex-col items-center gap-3 py-12">
+                  <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#a371f7' }} />
+                  <p className="text-sm" style={{ color: '#8b949e' }}>Sales agent is drafting the emails…</p>
+                </div>
+              )}
+
+              {negoError && (
+                <p className="text-sm rounded-lg p-3 mb-3" style={{ background: '#4a1f1f', color: '#f85149' }}>{negoError}</p>
+              )}
+
+              {!negoLoading && drafts.map((d, i) => (
+                <div key={i} className="rounded-xl border p-4 mb-4" style={{ background: '#0d1117', borderColor: '#30363d' }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="font-bold text-sm" style={{ color: '#e6edf3' }}>{d.vendor}</span>
+                    {!d.email_found && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                        style={{ background: 'rgba(210,153,34,.15)', color: '#d29922' }}>
+                        <AlertTriangle className="w-3 h-3" /> email not found — enter it below
+                      </span>
+                    )}
+                  </div>
+
+                  <label className="block text-[11px] font-semibold mb-1" style={{ color: '#8b949e' }}>To</label>
+                  <input
+                    value={d.email ?? ''}
+                    onChange={e => updateDraft(i, { email: e.target.value })}
+                    placeholder="vendor contact email"
+                    className="w-full rounded-lg px-3 py-2 text-sm border outline-none mb-3"
+                    style={{ background: '#0d1117', borderColor: d.email ? '#30363d' : '#d29922', color: '#e6edf3' }}
+                  />
+
+                  <label className="block text-[11px] font-semibold mb-1" style={{ color: '#8b949e' }}>Subject</label>
+                  <input
+                    value={d.subject}
+                    onChange={e => updateDraft(i, { subject: e.target.value })}
+                    className="w-full rounded-lg px-3 py-2 text-sm border outline-none mb-3"
+                    style={{ background: '#0d1117', borderColor: '#30363d', color: '#e6edf3' }}
+                  />
+
+                  <label className="block text-[11px] font-semibold mb-1" style={{ color: '#8b949e' }}>Message</label>
+                  <textarea
+                    value={d.body}
+                    onChange={e => updateDraft(i, { body: e.target.value })}
+                    rows={8}
+                    className="w-full rounded-lg px-3 py-2 text-sm border outline-none resize-y mb-3"
+                    style={{ background: '#0d1117', borderColor: '#30363d', color: '#c9d1d9' }}
+                  />
+
+                  <div className="flex gap-2">
+                    <a href={mailtoHref(d)}
+                      className="px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5"
+                      style={{ background: d.email ? 'linear-gradient(135deg,#7c3aed,#4f46e5)' : '#21262d',
+                        color: d.email ? '#fff' : '#6b7280', pointerEvents: d.email ? 'auto' : 'none' }}>
+                      <Mail className="w-3.5 h-3.5" /> Open in email
+                    </a>
+                    <button onClick={() => navigator.clipboard?.writeText(d.body)}
+                      className="px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                      style={{ background: '#21262d', color: '#c9d1d9' }}>
+                      <Copy className="w-3.5 h-3.5" /> Copy message
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {!negoLoading && (
+                <button onClick={() => setNegoOpen(false)}
+                  className="w-full p-2.5 rounded-xl text-sm font-medium mt-1"
+                  style={{ background: '#21262d', color: '#c9d1d9' }}>
+                  Done
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -225,6 +225,86 @@ def search_vendors(
     return []
 
 
+def draft_negotiation_email(
+    vendor: str,
+    better_vendor: str,
+    category: str = "",
+    vendor_context: str = "",
+) -> dict:
+    """
+    Sales-negotiation agent: drafts a firm-but-professional email to `vendor`
+    saying a competitor (`better_vendor`) is currently ahead and inviting a
+    revised offer (better price/service) sent as a PDF. Also tries to find the
+    vendor's public contact email. Returns {vendor, email, email_found, subject, body}.
+    """
+    system = (
+        "You are a procurement sales-negotiation agent. You write concise, firm but professional "
+        "negotiation emails to vendors and, when possible, find the vendor's public sales or "
+        "contact email address. Only provide an email you are genuinely confident is a real, "
+        "current public address; otherwise return null — never invent one."
+    )
+    user = (
+        f"We are selecting a {category or 'vendor'} and evaluated several options. After "
+        f"assessment, {better_vendor} currently comes out ahead of {vendor}.\n\n"
+        f"Write a concise, professional email to {vendor} that:\n"
+        f"- states that, after careful evaluation, a competing vendor is currently the stronger choice;\n"
+        f"- invites {vendor} to submit a revised offer with a better price and/or improved service if they want to win our business;\n"
+        f"- makes clear we may switch to the competitor;\n"
+        f"- asks them to send their new offer as a PDF.\n\n"
+        + (f"Context about {vendor}:\n{vendor_context[:1500]}\n\n" if vendor_context.strip() else "")
+        + f"Also find {vendor}'s public sales/contact email if you are confident it is real.\n\n"
+        'Return JSON: {"email": "<address or null>", "email_found": true or false, '
+        '"subject": "<subject line>", "body": "<full email body with a greeting and a '
+        '[Your name] sign-off placeholder>"}'
+    )
+
+    for model in (f"{_MODEL}:online", _MODEL):   # web search first for the email lookup
+        try:
+            resp = _client().chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=700,
+                temperature=0.4,
+            )
+            data = json.loads(resp.choices[0].message.content)
+            raw_email = data.get("email")
+            email = raw_email if isinstance(raw_email, str) and "@" in raw_email else None
+            body = str(data.get("body", "")).strip()
+            if body:
+                return {
+                    "vendor":      vendor,
+                    "email":       email,
+                    "email_found": bool(email) and bool(data.get("email_found", True)),
+                    "subject":     str(data.get("subject", "")).strip()[:200]
+                                   or f"Revised proposal request — {category or 'our procurement'}",
+                    "body":        body[:4000],
+                }
+        except Exception:
+            continue
+
+    # Deterministic fallback if the model is unavailable
+    return {
+        "vendor":      vendor,
+        "email":       None,
+        "email_found": False,
+        "subject":     f"Revised proposal request — {category or 'our procurement'}",
+        "body": (
+            f"Dear {vendor} team,\n\n"
+            f"Thank you for your proposal. After a careful evaluation of the available options, a "
+            f"competing vendor currently represents the stronger choice for our requirements, and we "
+            f"are preparing to move forward with them.\n\n"
+            f"Before we finalise our decision, we wanted to give you the opportunity to revise your "
+            f"offer. If you are able to improve your pricing and/or service, we would be glad to "
+            f"reconsider. Please send any updated proposal to us as a PDF.\n\n"
+            f"We look forward to hearing from you.\n\nBest regards,\n[Your name]"
+        ),
+    }
+
+
 def _dedupe_agents(selected: Optional[List[str]]) -> List[str]:
     ids = selected or ALL_AGENTS
     seen: list[str] = []
