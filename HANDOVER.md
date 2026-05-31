@@ -141,6 +141,10 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   (hard_constraints_passed, requirements_matrix 0–1, persona_alignment 1–5, analytical_summary) +
   deterministic `compatibility_score` 0–100 = `(0.5*softMandatoryWeighted + 0.5*personaNorm) *
   hardModifier(1.0 or 0.25) * 100`. The frontend What-If simulator mirrors this formula client-side.
+  Scoring rigor: `SCORING_SYSTEM_PROMPT` starts with an **Evidence-First rule** (rule 0 — no
+  evidence in `<vendor_data>` ⇒ soft score 0.0 / mandatory `hard_constraints_passed=false`; never
+  infer features); `score_vendor` runs at **temperature=0** (deterministic) and feeds up to **10k**
+  chars each of vendor_data and the transcript.
 
 ---
 

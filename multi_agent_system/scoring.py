@@ -27,6 +27,10 @@ INPUTS PROVIDED
 3. <board_debate_transcript>: the conversation between the CEO, CTO, CFO, and CSO personas.
 
 INSTRUCTIONS & LOGIC CONSTRAINTS
+0. EVIDENCE-FIRST RULE: Before assigning any score, locate the exact sentence or data point in \
+<vendor_data> that supports it. If no direct evidence exists in the vendor document, the score MUST \
+be 0.0 for soft requirements and hard_constraints_passed must be set to false for mandatory ones. \
+Never infer, assume, or guess that a feature exists unless it is explicitly stated in the vendor data.
 1. HARD CONSTRAINTS (Pass/Fail): identify critical requirements (e.g. "Must be EU-hosted",
    "Budget max 400€/month"). If the vendor violates a hard constraint, set hard_constraints_passed
    to false.
@@ -149,8 +153,8 @@ def score_vendor(vendor_name: str, requirements: str, vendor_data: str, transcri
     """Score a single vendor; returns the normalised scorecard + compatibility_score."""
     user = (
         f"<user_requirements>\n{requirements}\n</user_requirements>\n\n"
-        f"<vendor_data>\n{(vendor_data or 'No vendor documents provided.')[:4000]}\n</vendor_data>\n\n"
-        f"<board_debate_transcript>\n{transcript[:6000]}\n</board_debate_transcript>\n\n"
+        f"<vendor_data>\n{(vendor_data or 'No vendor documents provided.')[:10000]}\n</vendor_data>\n\n"
+        f"<board_debate_transcript>\n{transcript[:10000]}\n</board_debate_transcript>\n\n"
         f"Target vendor to score: {vendor_name}\n"
         f"Return the JSON scorecard for THIS vendor only."
     )
@@ -163,7 +167,7 @@ def score_vendor(vendor_name: str, requirements: str, vendor_data: str, transcri
             ],
             response_format={"type": "json_object"},
             max_tokens=1100,
-            temperature=0.2,
+            temperature=0,
         )
         card = _normalise_card(json.loads(resp.choices[0].message.content), vendor_name)
     except Exception:
