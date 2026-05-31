@@ -252,6 +252,8 @@ def debate(req: SimulateRequest, db: DbSession = Depends(get_db)):
 
 # How much combined vendor text we keep per session (agents truncate further)
 MAX_VENDOR_TEXT = 40_000
+# Hard cap on total sources per session (uploaded files + AI-found vendors)
+MAX_VENDORS = 4
 
 
 @app.post("/api/upload/{session_id}")
@@ -268,6 +270,12 @@ async def upload_vendor_files(
     session = crud.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Enforce a hard cap of MAX_VENDORS total sources (files), flagged or not
+    existing_count = len(parse_documents((session.step3.vendor_text if session.step3 else "") or ""))
+    remaining_slots = MAX_VENDORS - existing_count
+    skipped = max(0, len(files) - max(0, remaining_slots))
+    files = files[:max(0, remaining_slots)]
 
     extracted_parts: List[str] = []
     saved_names: List[str] = []
@@ -321,6 +329,7 @@ async def upload_vendor_files(
         "documents":       summary["documents"],
         "detected_vendors": summary["detected_vendors"],
         "category":        summary["category"],
+        "skipped":         skipped,   # files not stored because the 4-source cap was hit
         "preview":         combined[:300] + ("…" if len(combined) > 300 else ""),
     }
 
@@ -330,9 +339,6 @@ class VendorSearchBody(BaseModel):
     requirements: Optional[str]       = ""
     count:        int                 = 3
     must_include: Optional[List[str]] = None
-
-
-MAX_VENDORS = 4
 
 
 @app.post("/api/vendor-search/{session_id}")
@@ -351,8 +357,7 @@ def vendor_search(session_id: str, body: VendorSearchBody, db: DbSession = Depen
     existing_names = (session.step3.vendor_names if session.step3 else []) or []
     parsed_existing = parse_documents(existing_text)
     flags = classify_documents(parsed_existing) if parsed_existing else {}
-    good_docs = [d for d in parsed_existing if flags.get(d["name"], {}).get("is_vendor", True)]
-    remaining = MAX_VENDORS - len(good_docs)   # cap counts only good vendor documents
+    remaining = MAX_VENDORS - len(parsed_existing)   # cap counts ALL sources, flagged or not
 
     def _docs(extra: Optional[List[dict]] = None) -> List[dict]:
         out = [

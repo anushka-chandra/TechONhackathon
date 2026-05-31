@@ -243,7 +243,7 @@ export default function LandingPage() {
   function openSearchModal() {
     // Auto-fill the field with the category detected from uploaded files (else empty)
     setSearchField(detectedCategory)
-    const remaining = Math.max(1, MAX_VENDORS - goodCount)
+    const remaining = Math.max(1, MAX_VENDORS - documents.length)
     setSearchCount(Math.min(3, remaining))
     setSearchOpen(true)
   }
@@ -450,8 +450,8 @@ export default function LandingPage() {
             Provide vendor information.
           </h1>
           <p className="text-lg font-light mb-12" style={{ color: '#9ca3af' }}>
-            Upload your existing vendor files and/or let our AI agent search the web — combine both if you like.
-            A maximum of {MAX_VENDORS} vendors will be compared.
+            Upload vendor files for any product or service, and/or let our AI agent search the web —
+            combine both if you like. Up to {MAX_VENDORS} sources in total.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
@@ -470,7 +470,7 @@ export default function LandingPage() {
               className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ border: '1px solid rgba(107,114,128,.5)' }}
               onClick={() => fileInputRef.current?.click()}
-              disabled={actionLoading !== null}
+              disabled={actionLoading !== null || documents.length >= MAX_VENDORS}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(99,102,241,.1)', color: '#818cf8' }}>
@@ -496,7 +496,7 @@ export default function LandingPage() {
               className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ border: '1px solid rgba(107,114,128,.5)' }}
               onClick={openSearchModal}
-              disabled={actionLoading !== null || goodCount >= MAX_VENDORS}
+              disabled={actionLoading !== null || documents.length >= MAX_VENDORS}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(56,189,248,.1)', color: '#38bdf8' }}>
@@ -526,11 +526,12 @@ export default function LandingPage() {
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-sm font-medium text-white">Sources gathered</span>
                   <span className="text-xs px-2 py-0.5 rounded-full"
-                    style={{ background: 'rgba(56,189,248,.15)', color: '#38bdf8' }}>
-                    {documents.length} file{documents.length !== 1 ? 's' : ''} · {goodCount} vendor{goodCount !== 1 ? 's' : ''} / {MAX_VENDORS}
+                    style={{ background: documents.length >= MAX_VENDORS ? 'rgba(244,63,94,.15)' : 'rgba(56,189,248,.15)',
+                      color: documents.length >= MAX_VENDORS ? '#fb7185' : '#38bdf8' }}>
+                    {documents.length} / {MAX_VENDORS} files · {goodCount} vendor{goodCount !== 1 ? 's' : ''}
                   </span>
-                  {goodCount >= MAX_VENDORS && (
-                    <span className="text-xs" style={{ color: '#fb7185' }}>Vendor limit reached</span>
+                  {documents.length >= MAX_VENDORS && (
+                    <span className="text-xs" style={{ color: '#fb7185' }}>Limit of {MAX_VENDORS} reached</span>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -803,13 +804,13 @@ export default function LandingPage() {
         <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
           How many vendors to add?{' '}
           <span style={{ color: '#6b7280' }}>
-            {goodCount > 0
-              ? `(${MAX_VENDORS - goodCount} slot${MAX_VENDORS - goodCount !== 1 ? 's' : ''} left — already have ${goodCount} vendor${goodCount !== 1 ? 's' : ''})`
+            {documents.length > 0
+              ? `(${MAX_VENDORS - documents.length} slot${MAX_VENDORS - documents.length !== 1 ? 's' : ''} left — already have ${documents.length})`
               : '(max 4)'}
           </span>
         </label>
         <div className="flex gap-2 mb-6">
-          {Array.from({ length: Math.max(1, MAX_VENDORS - goodCount) }, (_, i) => i + 1).map(n => (
+          {Array.from({ length: Math.max(1, MAX_VENDORS - documents.length) }, (_, i) => i + 1).map(n => (
             <button key={n} onClick={() => setSearchCount(n)}
               className="flex-1 py-2 rounded-xl text-sm font-medium transition-colors"
               style={{

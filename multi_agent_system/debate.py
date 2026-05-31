@@ -40,9 +40,10 @@ def extract_vendor_names(text: str, max_vendors: int = 4) -> List[str]:
             model=_MODEL,
             messages=[
                 {"role": "system", "content":
-                    "You identify the distinct software vendors or products being proposed in "
-                    "procurement documents. Ignore any document that is NOT a vendor proposal "
-                    "(recipes, unrelated notes, etc.)."},
+                    "You identify the distinct vendors or products described in procurement "
+                    "documents — for ANY kind of product or service (software, appliances, "
+                    "equipment, machinery, services, etc.). Ignore any document that does NOT "
+                    "contain vendor/product information (recipes, unrelated notes, etc.)."},
                 {"role": "user", "content":
                     "From the following documents, list ONLY the distinct vendor/product names that "
                     "are genuine procurement options to compare. Use the real product name where given.\n\n"
@@ -76,12 +77,13 @@ def detect_category(text: str) -> str:
             model=_MODEL,
             messages=[
                 {"role": "system", "content":
-                    "You identify the single product/software category a set of vendor "
-                    "documents belong to."},
+                    "You identify the single product category a set of vendor documents belong "
+                    "to — for any kind of product or service."},
                 {"role": "user", "content":
-                    "What software/product category do these vendor documents describe? "
+                    "What product/service category do these vendor documents describe? "
                     "Answer with a short category phrase only "
-                    "(e.g. 'project management software', 'CRM', 'cloud storage').\n\n"
+                    "(e.g. 'project management software', 'washing machines', "
+                    "'commercial refrigerators', 'office chairs').\n\n"
                     f"{text[:4000]}\n\n"
                     'Return JSON: {"category": "<short phrase>"}'},
             ],
@@ -111,9 +113,12 @@ def classify_documents(documents: List[dict]) -> dict:
             model=_MODEL,
             messages=[
                 {"role": "system", "content":
-                    "You classify whether each uploaded file is a genuine vendor or product "
-                    "proposal relevant to a software procurement decision, or unrelated noise "
-                    "(e.g. a recipe, a personal note, marketing fluff with no product). Be strict."},
+                    "You classify whether each uploaded file contains genuine vendor or product "
+                    "information (an offer, spec sheet, brochure, or proposal for ANY kind of "
+                    "product or service — software, appliances, equipment, machinery, services, "
+                    "etc.) that could inform a purchasing decision, or whether it is unrelated "
+                    "noise (e.g. a recipe, a personal note, random text). Be strict: mark "
+                    "is_vendor true only when the file describes a purchasable product/vendor."},
                 {"role": "user", "content":
                     f"Classify each file below.\n\n{listing}\n\n"
                     'Return JSON: {"files": [{"index": 0, "is_vendor": true, '
@@ -157,7 +162,9 @@ def search_vendors(
 
     system = (
         "You are a procurement market researcher. You identify real, currently-available "
-        "software vendors/products and write a concise factual brief for each."
+        "vendors/products in a given category — for ANY kind of product or service (software, "
+        "appliances, equipment, machinery, services, etc.) — and write a concise factual brief "
+        "for each."
     )
 
     parts: List[str] = []
