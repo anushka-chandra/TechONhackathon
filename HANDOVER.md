@@ -215,17 +215,13 @@ Most recent feature work (all type-checked clean and verified over HTTP/the prox
   manually typed vendors (stored as standard Document blocks, count toward the 4-source cap).
 - `app/debate/page.tsx` — removed the redundant "Motion before the board" banner.
 
-**SummaryCharts** (radar + cost-sensitivity) — committed in `3e19201`.
+Also committed since: **SummaryCharts** (radar + cost-sensitivity, `3e19201`), the **DecisionMatrix**
+(`build_decision_matrix` + `frontend/components/DecisionMatrix.tsx`, rendered in the Summary section
+and the PDF report, `420fefe`), and the **four board personas** (CEO/CFO/CTO/CSO) rewritten with the
+user's new concise prompts.
 
-**Uncommitted (built + type-checked, not pushed yet):**
-- `multi_agent_system/scoring.py` `build_decision_matrix()` + `debate.py` (result now includes
-  `decision_matrix`).
-- `frontend/components/DecisionMatrix.tsx` (NEW, static, `variant: dark | print`) wired into
-  `app/debate/page.tsx`: rendered (dark) below SummaryCharts in the Summary section, and (print)
-  inside the `#decision-report` PDF report after the Compatibility Matrix section.
-- `HANDOVER.md` — this update.
-
-When you make new changes, update this section (and the rest of this file) accordingly.
+Working tree clean. When you make new changes, update this section (and the rest of this file)
+accordingly.
 
 ---
 
