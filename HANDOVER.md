@@ -129,7 +129,11 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   `extract_vendor_names()` (cap 4, excludes noise), `detect_category()`, `classify_documents()`
   (vendor vs noise, any product type), `search_vendors()` (`:online` first, knowledge fallback,
   context_docs = good files only), `draft_negotiation_email()`.
-- `scoring.py` — `score_all_vendors()` / `score_vendor()`: per-vendor auditable scorecard
+- `scoring.py` — `build_decision_matrix(scorecards)`: deterministic normalized purchase-decision
+  matrix across all vendors (weights: hard=2x/soft=1x normalized to sum 1; hard = pass/fail with 0 +
+  FAILED flag; soft = proportional credit; per-requirement justification; totals + ranking +
+  top-vendor explanation). Included in `run_debate` result as `decision_matrix`. Also:
+  `score_all_vendors()` / `score_vendor()`: per-vendor auditable scorecard
   (hard_constraints_passed, requirements_matrix 0–1, persona_alignment 1–5, analytical_summary) +
   deterministic `compatibility_score` 0–100 = `(0.5*softMandatoryWeighted + 0.5*personaNorm) *
   hardModifier(1.0 or 0.25) * 100`. The frontend What-If simulator mirrors this formula client-side.
@@ -211,9 +215,14 @@ Most recent feature work (all type-checked clean and verified over HTTP/the prox
   manually typed vendors (stored as standard Document blocks, count toward the 4-source cap).
 - `app/debate/page.tsx` — removed the redundant "Motion before the board" banner.
 
+**SummaryCharts** (radar + cost-sensitivity) — committed in `3e19201`.
+
 **Uncommitted (built + type-checked, not pushed yet):**
-- `frontend/components/SummaryCharts.tsx` (NEW) + wired into `app/debate/page.tsx` (import + rendered
-  below the Debate Summary box) — the two interactive plots (radar + cost-sensitivity).
+- `multi_agent_system/scoring.py` `build_decision_matrix()` + `debate.py` (result now includes
+  `decision_matrix`).
+- `frontend/components/DecisionMatrix.tsx` (NEW, static, `variant: dark | print`) wired into
+  `app/debate/page.tsx`: rendered (dark) below SummaryCharts in the Summary section, and (print)
+  inside the `#decision-report` PDF report after the Compatibility Matrix section.
 - `HANDOVER.md` — this update.
 
 When you make new changes, update this section (and the rest of this file) accordingly.
@@ -228,8 +237,12 @@ When you make new changes, update this section (and the rest of this file) accor
 - **Profile/sign-in** is localStorage only — no real auth backend.
 - **Negotiation email lookup** may hallucinate plausible addresses — UI tells the user to verify.
 - `:online` web search adds a small per-search $ surcharge (drove the $ spend up vs token count).
-- OpenRouter key on the user's account: $100 limit, ~$0.73 spent total as of last check, **expires
-  2026-06-05**. Check usage: `curl -s https://openrouter.ai/api/v1/auth/key -H "Authorization: Bearer $OPENROUTER_API_KEY"`.
+- OpenRouter: the key has a **$100 spend cap** (`/auth/key` shows usage ~$1.01, "remaining" ~$98.99)
+  BUT the **account's actual credit wallet is depleted** — live API calls now return
+  **`402 Insufficient credits`**. So as of this handover, ALL AI features silently fall back to
+  empties/garbage (e.g. decision matrix shows placeholder vendors). This is NOT a code bug — the user
+  must top up credits at https://openrouter.ai/settings/credits. The "remaining $98.99" is the key
+  cap, not the wallet. Key expires **2026-06-05**.
 
 ---
 

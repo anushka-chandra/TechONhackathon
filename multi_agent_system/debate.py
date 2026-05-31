@@ -18,7 +18,7 @@ from multi_agent_system.orchestrator import (
     _extract_vendors,
     _pick_winner,
 )
-from multi_agent_system.scoring import score_all_vendors
+from multi_agent_system.scoring import score_all_vendors, build_decision_matrix
 
 # Three debate rounds, in order
 PHASES: list[tuple[str, str]] = [
@@ -478,5 +478,6 @@ def run_debate(
             "cons":         synth["cons"],
         },
         "scorecards": scorecards,
+        "decision_matrix": build_decision_matrix(scorecards),
         "powered_by": "real_agents",
     }

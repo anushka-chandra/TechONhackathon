@@ -175,3 +175,111 @@ def score_vendor(vendor_name: str, requirements: str, vendor_data: str, transcri
 
 def score_all_vendors(vendors: List[str], requirements: str, vendor_data: str, transcript: str) -> List[dict]:
     return [score_vendor(v, requirements, vendor_data, transcript) for v in vendors]
+
+
+def _one_sentence(text: str, limit: int = 200) -> str:
+    text = (text or "").strip()
+    if not text:
+        return ""
+    first = text.split(". ")[0].rstrip(".")
+    return (first + ".")[:limit]
+
+
+def build_decision_matrix(scorecards: List[dict]) -> dict:
+    """
+    Build one normalized, mathematically-grounded purchase-decision matrix across
+    ALL vendors from their scorecards. Each requirement is weighted (hard = 2x,
+    soft = 1x, then normalized to sum to 1). Hard constraints are pass/fail: a
+    vendor that does not meet a hard constraint scores 0 and is marked FAILED;
+    soft constraints receive proportional partial credit (the 0-1 factual score).
+    Aggregation, totals and ranking are computed internally — only final results
+    are returned (no formulas/intermediates exposed).
+    """
+    vendors = [sc.get("vendor_name", "") for sc in scorecards]
+    if not vendors:
+        return {"vendors": [], "requirements": [], "totals": {}, "ranking": [], "explanation": ""}
+
+    # Merge requirements across vendors by canonical (lowercased) name
+    order: List[str] = []
+    canon: dict = {}
+    for sc in scorecards:
+        vn = sc.get("vendor_name", "")
+        for m in sc.get("requirements_matrix", []) or []:
+            crit = str(m.get("criterion", "")).strip()
+            if not crit:
+                continue
+            lc = crit.lower()
+            if lc not in canon:
+                canon[lc] = {"name": crit, "mandatory": False, "raw": {}}
+                order.append(lc)
+            if m.get("is_mandatory"):
+                canon[lc]["mandatory"] = True
+            canon[lc]["raw"][vn] = {
+                "score": max(0.0, min(1.0, float(m.get("score", 0) or 0))),
+                "evidence": str(m.get("evidence", "")),
+            }
+
+    total_weight = sum(2 if canon[lc]["mandatory"] else 1 for lc in order) or 1
+    totals = {v: 0.0 for v in vendors}
+    requirements: List[dict] = []
+
+    for lc in order:
+        c = canon[lc]
+        weight = (2 if c["mandatory"] else 1) / total_weight
+        scores: dict = {}
+        for v in vendors:
+            raw = c["raw"].get(v)
+            if raw is None:
+                value, failed = 0.0, c["mandatory"]
+            elif c["mandatory"]:
+                passed = raw["score"] >= 0.5
+                value, failed = (1.0 if passed else 0.0), (not passed)
+            else:
+                value, failed = round(raw["score"], 2), False
+            scores[v] = {"score": round(value, 2), "failed": failed}
+            totals[v] += weight * value
+
+        best_v = max(vendors, key=lambda v: scores[v]["score"])
+        best_ev = (c["raw"].get(best_v) or {}).get("evidence", "")
+        justification = _one_sentence(best_ev) or f"Best aligned with {best_v}."
+        failed_vendors = [v for v in vendors if scores[v]["failed"]]
+        if c["mandatory"] and failed_vendors:
+            justification = justification.rstrip(".") + f". Hard constraint failed by {', '.join(failed_vendors)}."
+
+        requirements.append({
+            "name": c["name"],
+            "mandatory": c["mandatory"],
+            "weight": round(weight, 3),
+            "scores": scores,
+            "justification": justification[:240],
+        })
+
+    ranking = sorted(
+        ({"vendor": v, "total": round(totals[v], 3)} for v in vendors),
+        key=lambda x: x["total"], reverse=True,
+    )
+
+    explanation = ""
+    if ranking:
+        top = ranking[0]["vendor"]
+        runner = ranking[1]["vendor"] if len(ranking) > 1 else ""
+        top_fails = [r["name"] for r in requirements if r["scores"][top]["failed"]]
+        strengths = sorted(
+            requirements, key=lambda r: r["weight"] * r["scores"][top]["score"], reverse=True,
+        )[:2]
+        sname = ", ".join(s["name"] for s in strengths if s["scores"][top]["score"] > 0)
+        explanation = (
+            f"{top} ranks first with the strongest weighted alignment overall"
+            + (f", led by {sname}" if sname else "")
+            + ("; it satisfies all hard constraints" if not top_fails
+               else f"; note unmet hard constraints: {', '.join(top_fails)}")
+            + (f", placing it ahead of {runner}." if runner else ".")
+        )
+
+    return {
+        "vendors": vendors,
+        "requirements": requirements,
+        "totals": {v: round(totals[v], 3) for v in vendors},
+        "ranking": ranking,
+        "explanation": explanation,
+    }

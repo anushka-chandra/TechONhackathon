@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import InteractiveSummaryPanel from '@/components/InteractiveSummaryPanel'
 import SummaryCharts from '@/components/SummaryCharts'
+import DecisionMatrix, { type DecisionMatrixData } from '@/components/DecisionMatrix'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
@@ -39,6 +40,7 @@ interface DebateResult {
   rounds: Round[]
   decision: Decision
   scorecards?: Scorecard[]
+  decision_matrix?: DecisionMatrixData
   powered_by: string
 }
 
@@ -709,6 +711,11 @@ function DebateContent() {
               <SummaryCharts scorecards={scorecards} winner={dec.winner} />
             )}
 
+            {/* Static normalized purchase-decision matrix (aligned with the analytics) */}
+            {data.decision_matrix && (
+              <DecisionMatrix matrix={data.decision_matrix} winner={dec.winner} />
+            )}
+
             {/* Pros / cons */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {(data?.vendors ?? []).map(v => (
@@ -1058,6 +1065,11 @@ function DebateContent() {
                     ))}
                     <p className="text-[10px]" style={{ color: '#9ca3af' }}>* mandatory (hard) constraint</p>
                   </section>
+                )}
+
+                {/* Normalized purchase-decision matrix (static, report-styled) */}
+                {data.decision_matrix && (
+                  <DecisionMatrix matrix={data.decision_matrix} winner={dec.winner} variant="print" />
                 )}
 
                 {/* Full transcript */}
