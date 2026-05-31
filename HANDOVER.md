@@ -101,7 +101,7 @@ Browser ──(/api/py/* same-origin proxy)──> Next.js server ──> FastAP
 | `POST /api/sessions/{id}/add-vendor` | manually typed vendor → stored as a Document block |
 | `POST /api/sessions/{id}/remove-document` | remove a source by name, reclassify |
 | `POST /api/context` | returns brief + vendor_text + classified `documents` + suggested_vendors + category (NO debate run) |
-| `POST /api/debate` | the big one: 3-round debate + scoring; returns rounds, decision, scorecards, inputs |
+| `POST /api/debate` | the big one: 3-round debate + scoring; returns rounds, decision, scorecards, decision_matrix, inputs |
 | `POST /api/simulate` | older one-shot eval (legacy `/dashboard` page) |
 | `POST /api/negotiate/{id}` | per-vendor negotiation email drafts (+ email lookup via `:online`) |
 | `POST /api/decision-report` | formal long-form PDF (reportlab); accepts generalized payload |
@@ -118,11 +118,15 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
 - `agents/base_agent.py` — `BaseAgent`: wraps OpenRouter. `evaluate()` (one-shot JSON) and
   `speak()` (debate turn per phase: opening/rebuttal/closing). `_MODEL` from `AGENT_MODEL`. Has
   deterministic fallbacks when the API is down. `_RESPONSE_SCHEMA` and debate schemas defined here.
-- `agents/{ceo,cfo,cto,cso,procurement}_agent.py` — personas. **Renamed** to CEO/CFO/CSO/CTO
-  (display `name`), each with a detailed, user-authored, role-specific `SYSTEM_PROMPT`
-  (generalized to "the software/product under consideration"). NOTE: the `agents/` folder also has
-  unused leftover files (employee_agent, manager_agent, it_legal_agent, commitment_extractor,
-  scoring_agent) — not wired into the debate; ignore unless asked.
+- `agents/{ceo,cfo,cto,cso,procurement}_agent.py` — personas. Display `name` = CEO/CFO/CTO/CSO; each
+  `SYSTEM_PROMPT` is the user's **latest concise persona** (CEO = long-term direction / competitive
+  position / execution at scale; CFO = cost structure / TCO / ROI / fiscal responsibility; CTO =
+  technical integrity / integration depth / reliability / low lock-in; CSO = risk exposure /
+  compliance / resilience / asset protection), each ending with `{_RESPONSE_SCHEMA}`. If the user
+  sends a new persona prompt, replace the whole `SYSTEM_PROMPT` body (keep name/role/icon + the
+  trailing `{_RESPONSE_SCHEMA}`). NOTE: the `agents/` folder also has unused leftover files
+  (employee_agent, manager_agent, it_legal_agent, commitment_extractor, scoring_agent) — not wired
+  into the debate; ignore unless asked.
 - `orchestrator.py` — `run_society()` (one-shot, used by `/api/simulate`), `AGENT_REGISTRY`,
   `_pick_winner`, `_extract_vendors`.
 - `debate.py` — the core: `run_debate()` (3 rounds → moderator synth → **scoring drives winner**),
@@ -161,17 +165,22 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   state for AI search / type-vendor / assistant chat. Single `return` renders `content` (hero / intro
   / wizard) wrapped in an opacity cross-fade div. `/?new=1` (from navbar New Chat) deep-links to Step 1.
 - `app/debate/page.tsx` — the results experience: pre-debate **context review** (editable Step 1 +
-  classified docs with flag/delete), animated debate, collapsible reasoning, decision panel,
-  **InteractiveSummaryPanel**, print-to-PDF report overlay, negotiation modal. (The old "Motion
-  before the board" banner was removed as redundant.)
+  classified docs with flag/delete), animated debate, collapsible reasoning, decision panel. The
+  Summary section renders (in order): winner banner → Debate Summary text → **SummaryCharts** (radar
+  + cost-sensitivity) → **DecisionMatrix** (static) → pros/cons → **InteractiveSummaryPanel**
+  (What-If). Also: print-to-PDF report overlay (`#decision-report`, includes a print-variant
+  DecisionMatrix) and the negotiation modal. (The old "Motion before the board" banner was removed.)
+  Reads `data.decision_matrix` / `data.scorecards` from the debate response.
 - `app/dashboard/page.tsx` — older simulator view (still reachable, not in main flow).
 - `app/projects/page.tsx`, `app/settings/page.tsx` — from the navbar.
 
 **Components**: `NavBar.tsx` (Clarity brand, New Chat, Projects, Settings, Profile modal),
-`InteractiveSummaryPanel.tsx` (What-If simulator), `SummaryCharts.tsx` (inline-SVG Value Alignment
-Radar with vendor toggles + custom hover tooltips, and a Tipping Point / Cost Sensitivity line chart
-with a team-size slider — isolated state, inserted below the Debate Summary in `app/debate/page.tsx`),
-`Sidebar.tsx` (LEGACY — no longer imported).
+`InteractiveSummaryPanel.tsx` (interactive What-If simulator; exports the `Scorecard` type used by
+others), `SummaryCharts.tsx` (inline-SVG Value Alignment Radar with vendor toggles + custom hover
+tooltips, and a Tipping Point / Cost Sensitivity line chart with a team-size slider — isolated
+state), `DecisionMatrix.tsx` (STATIC, non-interactive normalized matrix; `variant: 'dark' | 'print'`
+— renders from `data.decision_matrix` in both the UI and the PDF report), `Sidebar.tsx` (LEGACY — no
+longer imported).
 
 **Contexts**: `ChatContext` (saved analyses in localStorage), `ThemeContext` (dark/light + language,
 toggles `html.light`), `ProfileContext` (company info in localStorage). All wrap the app in
@@ -202,26 +211,27 @@ app shell share `--app-bg = #050505` (seamless, no border). Reusable keyframes: 
 
 ## 10. Current state (as of this handover)
 
-Everything below is **committed and pushed** to `main`. Working tree clean.
+**Everything is committed and pushed to `main`. Working tree clean.**
+Latest commit: `32fbf23` (CEO/CFO/CTO/CSO persona rewrite). All frontend work type-checks clean
+(`npx tsc --noEmit` from `frontend/`) and backend features were verified over HTTP/the proxy.
 
-Most recent feature work (all type-checked clean and verified over HTTP/the proxy):
-- `README.md` — full plain-English rewrite. `requirements.txt` — populated (fastapi, uvicorn,
-  pydantic, sqlalchemy, openai, pypdf, python-multipart, requests, reportlab).
-- `HANDOVER.md` (this file) — engineering handover; keep it updated with every change.
-- `backend/report_generator.py` + `ui/server.py` `/api/decision-report` — formal long-form PDF.
-- `frontend/components/InteractiveSummaryPanel.tsx` — What-If simulator; replaced the static
-  on-screen Compatibility Matrix in `app/debate/page.tsx` (PDF report's static matrix unchanged).
-- `ui/server.py` `/api/sessions/{id}/add-vendor` + `app/page.tsx` "Type Details" card & modal —
-  manually typed vendors (stored as standard Document blocks, count toward the 4-source cap).
-- `app/debate/page.tsx` — removed the redundant "Motion before the board" banner.
+Feature inventory that exists today (all live on `main`):
+- **Landing** — Clarity hero (orb + neural net), opacity cross-fade into the wizard.
+- **3-step wizard** — requirements (+ assistant chatbot), board selection, vendor sources
+  (Upload / AI Web Search / Type Details), pre-debate context review with flag/delete + the 4-source
+  cap, all sources stored as standard Document blocks.
+- **Debate** — 3-round multi-agent debate, animated playback, collapsible reasoning, moderator synth.
+- **Decision/Summary** — winner banner, summary, **SummaryCharts** (radar + cost-sensitivity),
+  **DecisionMatrix** (static, also in PDF), pros/cons, **InteractiveSummaryPanel** (What-If).
+- **Scoring** — auditable per-vendor `compatibility_score` + `build_decision_matrix` (drives winner).
+- **Outputs** — browser print-to-PDF report; formal long-form PDF via `/api/decision-report`
+  (`backend/report_generator.py`, reportlab) — NOTE: endpoint exists but is **not yet wired to a UI
+  button** (see §12); negotiation emails via `/api/negotiate`.
+- **App shell** — top NavBar (New Chat / Projects / Settings / Profile), Projects + Settings pages,
+  Theme/Profile/Chat contexts.
+- **Docs** — `README.md` (plain-English), this `HANDOVER.md`, `requirements.txt` populated.
 
-Also committed since: **SummaryCharts** (radar + cost-sensitivity, `3e19201`), the **DecisionMatrix**
-(`build_decision_matrix` + `frontend/components/DecisionMatrix.tsx`, rendered in the Summary section
-and the PDF report, `420fefe`), and the **four board personas** (CEO/CFO/CTO/CSO) rewritten with the
-user's new concise prompts.
-
-Working tree clean. When you make new changes, update this section (and the rest of this file)
-accordingly.
+When you make new changes, update this section (and the rest of this file) accordingly.
 
 ---
 
