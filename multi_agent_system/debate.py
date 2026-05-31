@@ -64,6 +64,36 @@ def extract_vendor_names(text: str, max_vendors: int = 4) -> List[str]:
         return []
 
 
+def detect_category(text: str) -> str:
+    """
+    Identify the product category that a set of vendor documents belong to,
+    as a short phrase (e.g. 'project management software', 'CRM'). "" on failure.
+    """
+    if not text.strip():
+        return ""
+    try:
+        resp = _client().chat.completions.create(
+            model=_MODEL,
+            messages=[
+                {"role": "system", "content":
+                    "You identify the single product/software category a set of vendor "
+                    "documents belong to."},
+                {"role": "user", "content":
+                    "What software/product category do these vendor documents describe? "
+                    "Answer with a short category phrase only "
+                    "(e.g. 'project management software', 'CRM', 'cloud storage').\n\n"
+                    f"{text[:4000]}\n\n"
+                    'Return JSON: {"category": "<short phrase>"}'},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=40,
+            temperature=0,
+        )
+        return str(json.loads(resp.choices[0].message.content).get("category", "")).strip()[:80]
+    except Exception:
+        return ""
+
+
 def classify_documents(documents: List[dict]) -> dict:
     """
     Classify each uploaded file as a genuine vendor/product proposal or unrelated

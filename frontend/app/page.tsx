@@ -7,6 +7,14 @@ import { useChat } from '@/context/ChatContext'
 type Phase = 'intro' | 'expanding' | 'main'
 type Step = 1 | 2 | 3
 
+// A source gathered in Step 3 (uploaded file or AI-found vendor), with classification
+interface UploadedDoc {
+  name: string
+  chars: number
+  is_vendor: boolean
+  reason?: string
+}
+
 const ALL_AGENTS = ['ceo', 'cto', 'cfo', 'cso'] as const
 type AgentId = typeof ALL_AGENTS[number]
 
@@ -93,9 +101,11 @@ export default function LandingPage() {
   const [searchCount, setSearchCount] = useState(3)
   const [searchLoading, setSearchLoading] = useState(false)
 
-  // Vendors gathered so far in Step 3 (from uploads and/or AI search), capped at 4
-  const [gathered, setGathered] = useState<string[]>([])
+  // Sources gathered in Step 3 (uploaded files + AI-found vendors), each classified
+  const [documents, setDocuments] = useState<UploadedDoc[]>([])
+  const [detectedCategory, setDetectedCategory] = useState('')   // category inferred from uploads
   const MAX_VENDORS = 4
+  const goodCount = documents.filter(d => d.is_vendor).length     // vendor sources count toward the cap
 
   // ── Intro ──────────────────────────────────────────────────────────
   function handleBubbleClick() {
@@ -231,15 +241,16 @@ export default function LandingPage() {
 
   // ── Step 3: open the AI vendor-search modal ───────────────────────
   function openSearchModal() {
-    setSearchField('')        // start empty — user types the field/category
-    const remaining = Math.max(1, MAX_VENDORS - gathered.length)
+    // Auto-fill the field with the category detected from uploaded files (else empty)
+    setSearchField(detectedCategory)
+    const remaining = Math.max(1, MAX_VENDORS - goodCount)
     setSearchCount(Math.min(3, remaining))
     setSearchOpen(true)
   }
 
   // ── Step 3: run the AI vendor search, accumulate the results ──────
   async function handleVendorSearch() {
-    if (!searchField.trim() && gathered.length === 0) return   // need a field, or files to base on
+    if (!searchField.trim() && documents.length === 0) return   // need a field, or files to base on
     setSearchLoading(true)
     if (sessionId) {
       try {
@@ -256,7 +267,7 @@ export default function LandingPage() {
         })
         if (res.ok) {
           const data = await res.json()
-          if (Array.isArray(data.vendors)) setGathered(data.vendors)
+          if (Array.isArray(data.documents)) setDocuments(data.documents)
         }
       } catch { /* keep whatever is already gathered */ }
     }
@@ -264,7 +275,7 @@ export default function LandingPage() {
     setSearchOpen(false)
   }
 
-  // ── Step 3: file upload → POST the PDF(s), accumulate detected vendors ─
+  // ── Step 3: file upload → POST the file(s), show every file as a source ─
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -278,7 +289,7 @@ export default function LandingPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ method: 'upload' }),
         })
-        // Upload every selected file in one request — backend extracts & combines text
+        // Upload every selected file in one request — backend extracts & classifies
         const fd = new FormData()
         Array.from(files).forEach(f => fd.append('files', f))
         const res = await fetch(`/api/py/upload/${sessionId}`, {
@@ -287,13 +298,31 @@ export default function LandingPage() {
         })
         if (res.ok) {
           const data = await res.json()
-          if (Array.isArray(data.detected_vendors)) setGathered(data.detected_vendors)
+          if (Array.isArray(data.documents)) setDocuments(data.documents)
+          if (data.category) setDetectedCategory(data.category)
         }
       } catch { /* keep whatever is already gathered */ }
     }
 
     setActionLoading(null)
     e.target.value = ''   // allow re-selecting the same file later
+  }
+
+  // ── Step 3: remove a source (e.g. a flagged non-vendor file) ──────
+  async function removeDoc(name: string) {
+    if (!sessionId) return
+    try {
+      const res = await fetch(`/api/py/sessions/${sessionId}/remove-document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: name }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data.documents)) setDocuments(data.documents)
+        setDetectedCategory(data.category ?? '')
+      }
+    } catch { /* leave list as-is on failure */ }
   }
 
   // ── Keyboard (onKeyDown — onKeyPress removed in React 19) ────────
@@ -441,7 +470,7 @@ export default function LandingPage() {
               className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ border: '1px solid rgba(107,114,128,.5)' }}
               onClick={() => fileInputRef.current?.click()}
-              disabled={actionLoading !== null || gathered.length >= MAX_VENDORS}
+              disabled={actionLoading !== null}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(99,102,241,.1)', color: '#818cf8' }}>
@@ -467,7 +496,7 @@ export default function LandingPage() {
               className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ border: '1px solid rgba(107,114,128,.5)' }}
               onClick={openSearchModal}
-              disabled={actionLoading !== null || gathered.length >= MAX_VENDORS}
+              disabled={actionLoading !== null || goodCount >= MAX_VENDORS}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(56,189,248,.1)', color: '#38bdf8' }}>
@@ -489,43 +518,73 @@ export default function LandingPage() {
             </button>
           </div>
 
-          {/* Gathered vendors + continue */}
+          {/* Gathered sources (files + AI vendors) + continue */}
           <div className="max-w-3xl mx-auto mt-8">
-            {gathered.length > 0 && (
+            {documents.length > 0 && (
               <div className="rounded-2xl p-4 mb-5 text-left"
                 style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)' }}>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-medium text-white">Vendors gathered</span>
+                  <span className="text-sm font-medium text-white">Sources gathered</span>
                   <span className="text-xs px-2 py-0.5 rounded-full"
-                    style={{ background: gathered.length >= MAX_VENDORS ? 'rgba(244,63,94,.15)' : 'rgba(56,189,248,.15)',
-                      color: gathered.length >= MAX_VENDORS ? '#fb7185' : '#38bdf8' }}>
-                    {gathered.length} / {MAX_VENDORS}
+                    style={{ background: 'rgba(56,189,248,.15)', color: '#38bdf8' }}>
+                    {documents.length} file{documents.length !== 1 ? 's' : ''} · {goodCount} vendor{goodCount !== 1 ? 's' : ''} / {MAX_VENDORS}
                   </span>
-                  {gathered.length >= MAX_VENDORS && (
-                    <span className="text-xs" style={{ color: '#9ca3af' }}>Maximum reached</span>
+                  {goodCount >= MAX_VENDORS && (
+                    <span className="text-xs" style={{ color: '#fb7185' }}>Vendor limit reached</span>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {gathered.map((v, i) => (
-                    <span key={i} className="text-xs px-2.5 py-1 rounded-full"
-                      style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', color: '#e5e7eb' }}>
-                      {v}
-                    </span>
-                  ))}
+                <div className="space-y-2">
+                  {documents.map((d, i) => {
+                    const noise = !d.is_vendor
+                    return (
+                      <div key={i} className="flex items-start gap-2 rounded-xl px-3 py-2"
+                        style={{
+                          background: noise ? 'rgba(248,63,94,.08)' : 'rgba(255,255,255,.04)',
+                          border: `1px solid ${noise ? 'rgba(248,63,94,.4)' : 'rgba(255,255,255,.1)'}`,
+                        }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                          stroke={noise ? '#fb7185' : '#818cf8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                          className="mt-0.5 shrink-0">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm truncate" style={{ color: noise ? '#fb7185' : '#e5e7eb' }}>{d.name}</span>
+                            {noise && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full"
+                                style={{ background: 'rgba(248,63,94,.18)', color: '#fb7185' }}>likely not a vendor</span>
+                            )}
+                          </div>
+                          {noise && (
+                            <p className="text-[11px] mt-0.5" style={{ color: '#9ca3af' }}>
+                              {d.reason || 'Does not look like a vendor document.'} Remove it, or keep it to feed its content to the board.
+                            </p>
+                          )}
+                        </div>
+                        <button onClick={() => removeDoc(d.name)} title="Remove"
+                          className="shrink-0 p-1 rounded-md" style={{ color: '#9ca3af' }}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
-            {gathered.length < 2 && (
+            {documents.length < 2 && (
               <p className="text-xs text-center mb-2" style={{ color: '#9ca3af' }}>
-                Add at least 2 vendors (via upload and/or AI search) to start the debate.
+                Add at least 2 sources (upload files and/or AI search) to start the debate.
               </p>
             )}
             <button
               onClick={goToDashboard}
-              disabled={gathered.length < 2}
+              disabled={documents.length < 2}
               className="w-full p-3.5 rounded-2xl text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: '#4f46e5', boxShadow: gathered.length >= 2 ? '0 0 15px rgba(79,70,229,.35)' : 'none' }}
+              style={{ background: '#4f46e5', boxShadow: documents.length >= 2 ? '0 0 15px rgba(79,70,229,.35)' : 'none' }}
             >
               Continue to debate
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -713,7 +772,7 @@ export default function LandingPage() {
 
         <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
           What field / category should we search?
-          {gathered.length > 0 && <span style={{ color: '#6b7280' }}> (optional)</span>}
+          {documents.length > 0 && <span style={{ color: '#6b7280' }}> (optional)</span>}
         </label>
         <input
           value={searchField}
@@ -723,12 +782,12 @@ export default function LandingPage() {
           style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
           autoFocus
         />
-        {gathered.length > 0 && (
+        {documents.length > 0 && (
           <p className="text-[11px] mb-4" style={{ color: '#818cf8' }}>
-            Leave blank to find vendors comparable to your uploaded files.
+            Leave blank to find vendors comparable to your uploaded files (good files only).
           </p>
         )}
-        {gathered.length === 0 && <div className="mb-4" />}
+        {documents.length === 0 && <div className="mb-4" />}
 
         <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
           Specific vendors to include <span style={{ color: '#6b7280' }}>(optional, comma-separated)</span>
@@ -744,13 +803,13 @@ export default function LandingPage() {
         <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
           How many vendors to add?{' '}
           <span style={{ color: '#6b7280' }}>
-            {gathered.length > 0
-              ? `(${MAX_VENDORS - gathered.length} slot${MAX_VENDORS - gathered.length !== 1 ? 's' : ''} left — already have ${gathered.length})`
+            {goodCount > 0
+              ? `(${MAX_VENDORS - goodCount} slot${MAX_VENDORS - goodCount !== 1 ? 's' : ''} left — already have ${goodCount} vendor${goodCount !== 1 ? 's' : ''})`
               : '(max 4)'}
           </span>
         </label>
         <div className="flex gap-2 mb-6">
-          {Array.from({ length: Math.max(1, MAX_VENDORS - gathered.length) }, (_, i) => i + 1).map(n => (
+          {Array.from({ length: Math.max(1, MAX_VENDORS - goodCount) }, (_, i) => i + 1).map(n => (
             <button key={n} onClick={() => setSearchCount(n)}
               className="flex-1 py-2 rounded-xl text-sm font-medium transition-colors"
               style={{
@@ -765,9 +824,9 @@ export default function LandingPage() {
 
         <button
           onClick={handleVendorSearch}
-          disabled={(!searchField.trim() && gathered.length === 0) || searchLoading}
+          disabled={(!searchField.trim() && documents.length === 0) || searchLoading}
           className="w-full p-3 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ background: '#4f46e5', boxShadow: (searchField.trim() || gathered.length > 0) ? '0 0 15px rgba(79,70,229,.4)' : 'none' }}
+          style={{ background: '#4f46e5', boxShadow: (searchField.trim() || documents.length > 0) ? '0 0 15px rgba(79,70,229,.4)' : 'none' }}
         >
           {searchLoading ? (<><SpinnerIcon /> Searching for vendors…</>) : (<>Find Vendors &amp; Continue</>)}
         </button>

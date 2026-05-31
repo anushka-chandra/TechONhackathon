@@ -16,7 +16,7 @@ from backend.database import crud
 from backend.pdf_extractor import extract_text
 from multi_agent_system.orchestrator import run_society
 from multi_agent_system.debate import (
-    run_debate, extract_vendor_names, classify_documents, search_vendors,
+    run_debate, extract_vendor_names, classify_documents, search_vendors, detect_category,
 )
 
 # ── Create / migrate DB on startup ────────────────────────────────────────────
@@ -147,6 +147,45 @@ def parse_documents(vendor_text: str) -> List[dict]:
     return docs
 
 
+def _good_text(parsed: List[dict], flags: dict) -> str:
+    """Join only the vendor (non-flagged) documents' text."""
+    return "\n\n".join(
+        f"=== Document: {d['name']} ===\n{d['content']}"
+        for d in parsed
+        if flags.get(d["name"], {}).get("is_vendor", True)
+    )
+
+
+def _build_step3_summary(session) -> dict:
+    """
+    Classify every source on the session, persist the vendor names detected from
+    the GOOD (non-flagged) documents only, and return the data the UI needs:
+    per-document flags, the detected vendor names, and the category.
+    """
+    text = (session.step3.vendor_text if session and session.step3 else "") or ""
+    parsed = parse_documents(text)
+    flags = classify_documents(parsed) if parsed else {}
+
+    documents = [
+        {
+            "name":      d["name"],
+            "chars":     len(d["content"]),
+            "is_vendor": bool(flags.get(d["name"], {}).get("is_vendor", True)),
+            "reason":    flags.get(d["name"], {}).get("reason", ""),
+        }
+        for d in parsed
+    ]
+
+    good_text = _good_text(parsed, flags)
+    detected_vendors = extract_vendor_names(good_text) if good_text.strip() else []
+    category = detect_category(good_text) if good_text.strip() else ""
+
+    if session and session.step3:
+        session.step3.vendor_names = detected_vendors
+
+    return {"documents": documents, "detected_vendors": detected_vendors, "category": category}
+
+
 @app.post("/api/context")
 def context(req: SimulateRequest, db: DbSession = Depends(get_db)):
     """
@@ -262,15 +301,13 @@ async def upload_vendor_files(
         except Exception:
             pass
 
-    detected_vendors: List[str] = []
+    summary = {"documents": [], "detected_vendors": [], "category": ""}
     if session.step3:
         existing = session.step3.vendor_text or ""
         merged = f"{existing}\n\n{combined}".strip() if existing else combined
         session.step3.vendor_text = merged[:MAX_VENDOR_TEXT]
-        # Detect the real vendors from all uploaded documents (ignores noise)
-        detected_vendors = extract_vendor_names(session.step3.vendor_text)
-        if detected_vendors:
-            session.step3.vendor_names = detected_vendors
+        # Classify every source, flag non-vendor files, detect vendors + category
+        summary = _build_step3_summary(session)
         db.commit()
         total_chars = len(session.step3.vendor_text)
     else:
@@ -281,7 +318,9 @@ async def upload_vendor_files(
         "files":           saved_names,
         "count":           len(saved_names),
         "chars_extracted": total_chars,
-        "detected_vendors": detected_vendors,
+        "documents":       summary["documents"],
+        "detected_vendors": summary["detected_vendors"],
+        "category":        summary["category"],
         "preview":         combined[:300] + ("…" if len(combined) > 300 else ""),
     }
 
@@ -308,17 +347,30 @@ def vendor_search(session_id: str, body: VendorSearchBody, db: DbSession = Depen
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    existing_text = session.step3.vendor_text if session.step3 else ""
+    existing_text = (session.step3.vendor_text if session.step3 else "") or ""
     existing_names = (session.step3.vendor_names if session.step3 else []) or []
-    remaining = MAX_VENDORS - len(existing_names)
+    parsed_existing = parse_documents(existing_text)
+    flags = classify_documents(parsed_existing) if parsed_existing else {}
+    good_docs = [d for d in parsed_existing if flags.get(d["name"], {}).get("is_vendor", True)]
+    remaining = MAX_VENDORS - len(good_docs)   # cap counts only good vendor documents
+
+    def _docs(extra: Optional[List[dict]] = None) -> List[dict]:
+        out = [
+            {
+                "name":      d["name"],
+                "chars":     len(d["content"]),
+                "is_vendor": bool(flags.get(d["name"], {}).get("is_vendor", True)),
+                "reason":    flags.get(d["name"], {}).get("reason", ""),
+            }
+            for d in parsed_existing
+        ]
+        return out + (extra or [])
 
     if remaining <= 0:
         return {
-            "session_id": session_id,
-            "vendors":    existing_names,
-            "count":      len(existing_names),
-            "added":      [],
-            "message":    f"You already have {MAX_VENDORS} vendors (the maximum).",
+            "session_id": session_id, "added": [], "documents": _docs(),
+            "detected_vendors": existing_names,
+            "message": f"You already have {MAX_VENDORS} vendors (the maximum).",
         }
 
     # Need either an explicit field, or uploaded docs to base the search on
@@ -333,9 +385,8 @@ def vendor_search(session_id: str, body: VendorSearchBody, db: DbSession = Depen
         requirements=body.requirements or "",
         count=min(body.count, remaining),
         must_include=body.must_include,
-        context_docs=existing_text,   # base the search on the user's uploaded files
+        context_docs=_good_text(parsed_existing, flags),   # ONLY good files guide the search
     )
-    # Drop any that duplicate an existing vendor, then keep only the remaining slots
     existing_lower = {n.lower() for n in existing_names}
     found = [v for v in found if v["name"].lower() not in existing_lower][:remaining]
     if not found:
@@ -345,26 +396,29 @@ def vendor_search(session_id: str, body: VendorSearchBody, db: DbSession = Depen
         f"=== Document: {v['name']} (AI web search) ===\n{v['info']}" for v in found
     )
     merged_text = f"{existing_text}\n\n{new_block}".strip() if existing_text else new_block
-    merged_names = (existing_names + [v["name"] for v in found])[:MAX_VENDORS]
+    detected_vendors = (existing_names + [v["name"] for v in found])[:MAX_VENDORS]
 
     if not session.step3:
         try:
-            session = crud.save_step3(db, session_id, method="search", vendor_names=merged_names)
+            session = crud.save_step3(db, session_id, method="search", vendor_names=detected_vendors)
         except Exception:
             pass
     if session.step3:
-        # method reflects "both" once files + search are combined
         session.step3.method = "both" if existing_text else "search"
-        session.step3.vendor_names = merged_names
+        session.step3.vendor_names = detected_vendors
         session.step3.vendor_text = merged_text[:MAX_VENDOR_TEXT]
         db.commit()
 
+    searched_docs = [
+        {"name": f"{v['name']} (AI web search)", "chars": len(v["info"]), "is_vendor": True, "reason": ""}
+        for v in found
+    ]
     return {
-        "session_id": session_id,
-        "vendors":    merged_names,
-        "count":      len(merged_names),
-        "added":      [v["name"] for v in found],
-        "remaining":  MAX_VENDORS - len(merged_names),
+        "session_id":       session_id,
+        "added":            [v["name"] for v in found],
+        "documents":        _docs(searched_docs),
+        "detected_vendors": detected_vendors,
+        "remaining":        remaining - len(found),
     }
 
 
@@ -383,13 +437,11 @@ def remove_document(session_id: str, body: RemoveDocBody, db: DbSession = Depend
         raise HTTPException(status_code=404, detail="Session or documents not found")
 
     docs = parse_documents(session.step3.vendor_text or "")
-    remaining = [d for d in docs if d["name"] != body.filename]
-
-    new_text = "\n\n".join(
-        f"=== Document: {d['name']} ===\n{d['content']}" for d in remaining
+    kept = [d for d in docs if d["name"] != body.filename]
+    session.step3.vendor_text = "\n\n".join(
+        f"=== Document: {d['name']} ===\n{d['content']}" for d in kept
     )
-    session.step3.vendor_text = new_text
-    session.step3.vendor_names = extract_vendor_names(new_text) if new_text.strip() else []
+    summary = _build_step3_summary(session)
     db.commit()
 
     # Best-effort: delete the file from disk too
@@ -398,11 +450,7 @@ def remove_document(session_id: str, body: RemoveDocBody, db: DbSession = Depend
     except Exception:
         pass
 
-    return {
-        "removed":          body.filename,
-        "remaining":        len(remaining),
-        "detected_vendors": session.step3.vendor_names,
-    }
+    return {"removed": body.filename, **summary}
 
 
 # ── Summarise endpoint ─────────────────────────────────────────────────────────
