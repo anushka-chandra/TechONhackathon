@@ -164,7 +164,10 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
 - `app/projects/page.tsx`, `app/settings/page.tsx` — from the navbar.
 
 **Components**: `NavBar.tsx` (Clarity brand, New Chat, Projects, Settings, Profile modal),
-`InteractiveSummaryPanel.tsx` (What-If simulator), `Sidebar.tsx` (LEGACY — no longer imported).
+`InteractiveSummaryPanel.tsx` (What-If simulator), `SummaryCharts.tsx` (inline-SVG Value Alignment
+Radar with vendor toggles + custom hover tooltips, and a Tipping Point / Cost Sensitivity line chart
+with a team-size slider — isolated state, inserted below the Debate Summary in `app/debate/page.tsx`),
+`Sidebar.tsx` (LEGACY — no longer imported).
 
 **Contexts**: `ChatContext` (saved analyses in localStorage), `ThemeContext` (dark/light + language,
 toggles `html.light`), `ProfileContext` (company info in localStorage). All wrap the app in
@@ -207,6 +210,11 @@ Most recent feature work (all type-checked clean and verified over HTTP/the prox
 - `ui/server.py` `/api/sessions/{id}/add-vendor` + `app/page.tsx` "Type Details" card & modal —
   manually typed vendors (stored as standard Document blocks, count toward the 4-source cap).
 - `app/debate/page.tsx` — removed the redundant "Motion before the board" banner.
+
+**Uncommitted (built + type-checked, not pushed yet):**
+- `frontend/components/SummaryCharts.tsx` (NEW) + wired into `app/debate/page.tsx` (import + rendered
+  below the Debate Summary box) — the two interactive plots (radar + cost-sensitivity).
+- `HANDOVER.md` — this update.
 
 When you make new changes, update this section (and the rest of this file) accordingly.
 

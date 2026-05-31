@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import InteractiveSummaryPanel from '@/components/InteractiveSummaryPanel'
+import SummaryCharts from '@/components/SummaryCharts'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
@@ -702,6 +703,11 @@ function DebateContent() {
               </h3>
               <p className="text-sm leading-relaxed" style={{ color: '#c9d1d9' }}>{dec.summary}</p>
             </div>
+
+            {/* Interactive plots that visually justify the recommendation */}
+            {scorecards.length > 0 && (
+              <SummaryCharts scorecards={scorecards} winner={dec.winner} />
+            )}
 
             {/* Pros / cons */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
