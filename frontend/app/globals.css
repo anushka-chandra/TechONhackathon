@@ -16,7 +16,30 @@
 :root {
   --background: #050505;
   --foreground: #ffffff;
+
+  /* App-shell theme tokens (flip with html.light) */
+  --app-bg: #0d1117;
+  --nav-bg: #0d1117;
+  --nav-border: #21262d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --panel: #161b22;
+  --panel-border: #30363d;
 }
+
+html.light {
+  --app-bg: #f6f8fa;
+  --nav-bg: #ffffff;
+  --nav-border: #d0d7de;
+  --text: #1f2328;
+  --text-dim: #57606a;
+  --panel: #ffffff;
+  --panel-border: #d0d7de;
+}
+
+/* The shell (navbar + Projects/Settings) follows the theme;
+   the immersive Home/Debate views keep their own dark canvas. */
+.app-shell { background: var(--app-bg); }
 
 html, body {
   height: 100%;
@@ -141,6 +164,18 @@ body {
 }
 
 .fade-in-up { animation: fadeInUp 1.2s cubic-bezier(.4,0,.2,1) forwards; }
+
+/* Landing "Decision Core" — slow orbital rotation + high-tech glow */
+@keyframes orbit-spin     { from { transform: rotate(0deg);   } to { transform: rotate(360deg); } }
+@keyframes orbit-spin-rev { from { transform: rotate(360deg); } to { transform: rotate(0deg);   } }
+@keyframes core-glow {
+  0%, 100% { box-shadow: 0 0 55px rgba(99,102,241,.5),  inset 0 0 28px rgba(255,255,255,.14); }
+  50%       { box-shadow: 0 0 110px rgba(99,102,241,.9), inset 0 0 44px rgba(255,255,255,.26); }
+}
+@keyframes node-twinkle {
+  0%, 100% { opacity: .35; }
+  50%       { opacity: 1;   }
+}
 
 /* Tap label */
 .tap-text {

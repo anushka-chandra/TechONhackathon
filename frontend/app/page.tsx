@@ -84,6 +84,7 @@ const SpinnerIcon = () => (
 export default function LandingPage() {
   const router = useRouter()
   const { addChat, updateChat } = useChat()
+  const [hasStartedAnalysis, setHasStartedAnalysis] = useState(false)   // landing hero → wizard
   const [phase, setPhase] = useState<Phase>('intro')
   const [step, setStep] = useState<Step>(1)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
@@ -116,6 +117,15 @@ export default function LandingPage() {
   const MAX_VENDORS = 4
   const goodCount = documents.filter(d => d.is_vendor).length     // vendor sources count toward the cap
 
+  // "New Chat" navigates to /?new=1 → skip the hero and land on Step 1 fresh
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') {
+      setHasStartedAnalysis(true)
+      setPhase('main')
+      setTimeout(() => inputRef.current?.focus(), 400)
+    }
+  }, [])
+
   // ── Intro ──────────────────────────────────────────────────────────
   function handleBubbleClick() {
     if (phase !== 'intro') return
@@ -124,6 +134,13 @@ export default function LandingPage() {
       setPhase('main')
       setTimeout(() => inputRef.current?.focus(), 600)
     }, 800)
+  }
+
+  // ── Landing hero → 3-step wizard ───────────────────────────────────
+  function startAnalysis() {
+    setHasStartedAnalysis(true)
+    setPhase('main')   // skip the orb intro; go straight to the existing Step 1
+    setTimeout(() => inputRef.current?.focus(), 600)
   }
 
   // ── Instant local summary ─────────────────────────────────────────
@@ -376,6 +393,142 @@ export default function LandingPage() {
   const stepClass = (n: Step) =>
     `step-container ${step === n ? 'step-active' : 'step-hidden'}`
 
+  // ── Landing Mode hero (shown before the 3-step wizard) ─────────────
+  if (!hasStartedAnalysis) {
+    // Neural-network rings of empty nodes around the core (viewBox 0..100)
+    const ring = (count: number, radius: number, offset = 0) =>
+      Array.from({ length: count }, (_, i) => {
+        const a = (i / count) * 2 * Math.PI - Math.PI / 2 + offset
+        return { x: 50 + radius * Math.cos(a), y: 50 + radius * Math.sin(a) }
+      })
+    const innerNodes = ring(8, 26)
+    const outerNodes = ring(14, 42, 0.22)
+
+    return (
+      <div className="relative w-full min-h-screen overflow-hidden fade-in-up" style={{ background: '#050505' }}>
+        <div className="bg-mesh" />
+
+        {/* Two-column hero: copy left, Clarity Decision Core right (y-centered) */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 min-h-screen flex flex-col lg:flex-row items-center gap-12 py-20">
+
+          {/* Left — copy, CTA, metrics */}
+          <div className="flex-1 w-full">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm mb-6"
+              style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', color: '#9ca3af' }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: '#6366f1' }} />
+              AI Purchasing Society
+            </div>
+
+            <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05] mb-6"
+              style={{ color: '#ffffff' }}>
+              Turn vendor noise into a<br />
+              <span style={{ background: 'linear-gradient(to right, #818cf8, #38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                defensible decision.
+              </span>
+            </h1>
+
+            <p className="text-lg font-light max-w-xl mb-9" style={{ color: '#9ca3af' }}>
+              A virtual boardroom of specialized AI agents debates your shortlist across budget,
+              security, compliance and more — then hands you an auditable, scored recommendation
+              you can stand behind.
+            </p>
+
+            <button
+              onClick={startAnalysis}
+              className="group inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full text-sm font-semibold transition-transform hover:scale-[1.03]"
+              style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: '#fff', boxShadow: '0 0 28px rgba(99,102,241,.45)' }}
+            >
+              Start Analysis
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" x2="19" y1="12" y2="12" /><polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Right — Clarity Decision Core with orbiting neural network (y-centered) */}
+          <div className="flex-1 w-full flex items-center justify-center">
+            <div className="relative" style={{ width: 'min(88vw, 480px)', aspectRatio: '1 / 1' }}>
+
+              {/* Rotating neural network (empty nodes + connectors) */}
+              <div className="absolute inset-0" style={{ animation: 'orbit-spin 60s linear infinite' }}>
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100"
+                  style={{ filter: 'drop-shadow(0 0 1.5px rgba(129,140,248,.7))' }} aria-hidden>
+                  {/* core → inner connectors */}
+                  {innerNodes.map((n, i) => (
+                    <line key={`ci${i}`} x1="50" y1="50" x2={n.x} y2={n.y}
+                      stroke="rgba(129,140,248,.22)" strokeWidth="0.28" />
+                  ))}
+                  {/* inner → outer mesh */}
+                  {innerNodes.map((n, i) => {
+                    const o = outerNodes[i % outerNodes.length]
+                    const o2 = outerNodes[(i + 1) % outerNodes.length]
+                    return (
+                      <g key={`io${i}`}>
+                        <line x1={n.x} y1={n.y} x2={o.x} y2={o.y} stroke="rgba(56,189,248,.16)" strokeWidth="0.22" />
+                        <line x1={n.x} y1={n.y} x2={o2.x} y2={o2.y} stroke="rgba(56,189,248,.12)" strokeWidth="0.18" />
+                      </g>
+                    )
+                  })}
+                  {/* outer ring loop */}
+                  {outerNodes.map((n, i) => {
+                    const next = outerNodes[(i + 1) % outerNodes.length]
+                    return <line key={`oo${i}`} x1={n.x} y1={n.y} x2={next.x} y2={next.y}
+                      stroke="rgba(129,140,248,.1)" strokeWidth="0.15" />
+                  })}
+                  {/* nodes (empty dots) */}
+                  {outerNodes.map((n, i) => (
+                    <circle key={`on${i}`} cx={n.x} cy={n.y} r="0.7" fill="#7dd3fc"
+                      style={{ animation: `node-twinkle ${3 + (i % 4)}s ease-in-out ${i * 0.2}s infinite` }} />
+                  ))}
+                  {innerNodes.map((n, i) => (
+                    <circle key={`in${i}`} cx={n.x} cy={n.y} r="1" fill="#a5b4fc"
+                      style={{ animation: `node-twinkle ${2.5 + (i % 3)}s ease-in-out ${i * 0.3}s infinite` }} />
+                  ))}
+                </svg>
+              </div>
+
+              {/* Pulsing rings behind the core */}
+              <div className="absolute rounded-full" style={{
+                top: '50%', left: '50%', width: 210, height: 210, transform: 'translate(-50%,-50%)',
+                border: '1px solid rgba(99,102,241,.45)', animation: 'pulse-ring 3.6s ease-out infinite',
+              }} />
+              <div className="absolute rounded-full" style={{
+                top: '50%', left: '50%', width: 210, height: 210, transform: 'translate(-50%,-50%)',
+                border: '1px solid rgba(56,189,248,.4)', animation: 'pulse-ring 3.6s ease-out 1.8s infinite',
+              }} />
+
+              {/* Central Clarity orb */}
+              <div className="absolute rounded-full"
+                style={{
+                  top: '50%', left: '50%', width: 180, height: 180, transform: 'translate(-50%,-50%)',
+                  background: 'radial-gradient(circle at 32% 26%, #c7d2fe 0%, #818cf8 30%, #4f46e5 62%, #312e81 100%)',
+                  animation: 'breathe 4.5s ease-in-out infinite, core-glow 3.2s ease-in-out infinite',
+                }}>
+                {/* rotating conic sheen */}
+                <div className="absolute inset-0 rounded-full" style={{
+                  background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,.28) 70deg, transparent 140deg, transparent 360deg)',
+                  animation: 'orbit-spin 6s linear infinite', mixBlendMode: 'screen',
+                }} />
+                {/* glossy highlight */}
+                <div className="absolute rounded-full" style={{
+                  top: '14%', left: '20%', width: '40%', height: '30%',
+                  background: 'radial-gradient(circle, rgba(255,255,255,.55), transparent 70%)', filter: 'blur(2px)',
+                }} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-black text-white tracking-tight"
+                    style={{ textShadow: '0 1px 10px rgba(0,0,0,.45)' }}>
+                    Clarity
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (phase === 'intro' || phase === 'expanding') {
     return (
       <div className="relative w-full h-screen flex items-center justify-center overflow-hidden"
@@ -408,17 +561,9 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="relative w-full h-screen flex flex-col items-center justify-center overflow-hidden fade-in-up"
+    <div className="relative w-full h-full min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center overflow-hidden fade-in-up"
       style={{ background: '#050505' }}>
       <div className="bg-mesh" />
-
-      {/* Header */}
-      <header className="w-full px-6 py-6 flex justify-between items-center absolute top-0 left-0 z-30">
-        <div className="text-xl font-medium tracking-tight"
-          style={{ background: 'linear-gradient(to right, #f3f4f6, #6b7280)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          Nexus
-        </div>
-      </header>
 
       {/* Steps */}
       <main className="flex-1 w-full relative overflow-hidden">
