@@ -456,19 +456,33 @@ def run_debate(
     # ── Quantitative scoring: mathematically-auditable compatibility matrix ──────
     transcript_text = "\n".join(f"{t['name']} ({t['phase']}): {t['message']}" for t in transcript)
     scorecards = score_all_vendors(vendor_list, requirements, vendor_info, transcript_text)
+    # build_decision_matrix is the single source of truth: it scores every vendor against
+    # the SAME normalized (union) requirement set. Derive each vendor's compatibility_score,
+    # the winner, and the no-viable-vendor signal from it so the banner, the matrix table,
+    # and the What-If simulator all use identical math and can never contradict each other.
+    decision_matrix = build_decision_matrix(scorecards)
     all_constraints_failed = False
     if scorecards:
+        totals = decision_matrix.get("totals", {})
+        for sc in scorecards:
+            sc["compatibility_score"] = round(totals.get(sc["vendor_name"], 0.0) * 100)
+
         best_idx = max(range(len(scorecards)), key=lambda i: scorecards[i]["compatibility_score"])
         winner = vendor_list[best_idx]
         vote_yes = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") == "YES")
         vote_total = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") in ("YES", "NO"))
         confidence = compute_derived_confidence(scorecards, vote_yes, vote_total)
 
-        # If every single vendor failed at least one hard constraint, there is no
-        # valid winner. Signal this clearly instead of crowning the least-bad option.
-        all_constraints_failed = all(
-            not sc.get("hard_constraints_passed", False) for sc in scorecards
-        )
+        # A vendor "qualifies" iff it fails NO mandatory requirement in the normalized
+        # matrix (identical to the frontend DecisionMatrix "no viable vendor" detection).
+        # If none qualify, there is no valid winner — signal it instead of crowning the
+        # least-bad option.
+        mandatory_reqs = [r for r in decision_matrix.get("requirements", []) if r.get("mandatory")]
+
+        def _qualifies(v: str) -> bool:
+            return all(not r["scores"].get(v, {}).get("failed", False) for r in mandatory_reqs)
+
+        all_constraints_failed = bool(mandatory_reqs) and not any(_qualifies(v) for v in vendor_list)
         if all_constraints_failed:
             winner = "NONE"
             confidence = 0
@@ -496,6 +510,6 @@ def run_debate(
             "cons":                  synth["cons"],
         },
         "scorecards": scorecards,
-        "decision_matrix": build_decision_matrix(scorecards),
+        "decision_matrix": decision_matrix,
         "powered_by": "real_agents",
     }

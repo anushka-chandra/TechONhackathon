@@ -153,17 +153,26 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   top-vendor explanation). Included in `run_debate` result as `decision_matrix`. Also:
   `score_all_vendors()` / `score_vendor()`: per-vendor auditable scorecard
   (hard_constraints_passed, requirements_matrix 0–1, persona_alignment 1–5, analytical_summary) +
-  deterministic `compatibility_score` 0–100. As of this session `_compute_score` uses the **same math
-  as `build_decision_matrix`** (hard rows binary 1.0/0.0 at the 0.5 threshold, soft rows proportional
-  0–1, weights hard=2/soft=1, normalised) — NO persona term, NO 0.25× modifier. So the scorecard
-  number, the matrix total, and the What-If base score now always agree; a vendor failing every hard
-  constraint (no soft credit) scores 0. (The old `(0.5*soft + 0.5*personaNorm)*hardMod` formula is
-  gone.) The frontend What-If simulator (`InteractiveSummaryPanel.recompute`) computes this same matrix
-  base, then adds a **persona bonus capped at +0.2** (`personaNorm*0.2`, total clamped ≤100) so the
-  persona sliders stay live/meaningful but can never lift an all-hard-failed (0) vendor above 20.
-  Separately, `DecisionMatrix` (and the debate-page banner) detect the "no viable vendor" case
-  (winner="NONE", or no vendor passes all mandatory rows) and show a red notice instead of crowning a
-  least-bad vendor.
+  deterministic `compatibility_score` 0–100. **SINGLE SOURCE OF TRUTH (normalized this session):
+  `build_decision_matrix` is authoritative.** It scores every vendor against the SAME union of all
+  vendors' requirement criteria (merged by lowercased name; a criterion only one vendor lists still
+  counts against the others — missing ⇒ 0, missing-mandatory ⇒ fail), hard rows binary 1.0/0.0 at the
+  0.5 threshold, soft rows proportional 0–1, weights hard=2/soft=1, normalised. `run_debate`
+  (`debate.py`) then **derives everything from that one matrix**: each scorecard's `compatibility_score
+  = round(totals[v]*100)`, the `winner = argmax(compatibility_score)` (== matrix rank #1), and
+  `all_constraints_failed` = "no vendor passes every mandatory matrix row" (identical to the frontend's
+  `noViable`). So the banner winner, the matrix totals, and the per-vendor scorecard number are the
+  exact same numbers and can never contradict. (`_compute_score` is still the same per-row formula but
+  over a vendor's OWN rows; in the debate path its value is immediately overwritten by the union total.
+  The old `(0.5*soft + 0.5*personaNorm)*hardMod` formula is gone.) The frontend What-If simulator
+  (`InteractiveSummaryPanel.recompute`) rebuilds the SAME union (`buildCanon`) and computes the same
+  matrix base, then adds a **persona bonus capped at +0.2** (`personaNorm*0.2`, total clamped ≤100) so
+  the persona sliders stay live/meaningful but can never lift an all-hard-failed (0) vendor above 20.
+  `DecisionMatrix` (and the debate-page banner) detect the "no viable vendor" case (winner="NONE", or
+  no vendor passes all mandatory rows) and show a red notice instead of crowning a least-bad vendor.
+  CAVEAT: union-merge keys off the exact lowercased criterion name, so if the LLM names the same hard
+  constraint differently per vendor ("Budget ≤ 400" vs "Budget cap") they won't merge and each vendor
+  can fail the other's row — a pre-existing matrix concern, now also reflected in the winner signal.
   Scoring rigor: `SCORING_SYSTEM_PROMPT` starts with an **Evidence-First rule** (rule 0 — no
   evidence in `<vendor_data>` ⇒ soft score 0.0 / mandatory `hard_constraints_passed=false`; never
   infer features); `score_vendor` runs at **temperature=0** (deterministic) and feeds up to **10k**

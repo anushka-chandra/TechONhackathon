@@ -27,20 +27,48 @@ const PERSONA_LABEL: Record<Persona, string> = {
 
 const DEFAULT_WEIGHTS: Record<Persona, number> = { CEO: 50, CTO: 50, CFO: 50, CSO: 50 }
 
-// Deterministic, client-side recompute — same shape as the backend formula, but
-// the persona lenses are re-weighted live and the hard penalty is toggleable.
-function recompute(sc: Scorecard, weights: Record<Persona, number>, enforceHard: boolean) {
-  const matrix = sc.requirements_matrix ?? []
-  if (!matrix.length) return 0
+// Canonical (union) requirement set across ALL vendors — mirrors the backend
+// build_decision_matrix exactly so the What-If base equals the matrix total and
+// the backend compatibility_score. A criterion only one vendor lists still counts
+// against the others (missing evidence ⇒ 0, mandatory ⇒ fail).
+interface CanonReq { mandatory: boolean; byVendor: Record<string, number> }
+interface Canon { order: string[]; reqs: Record<string, CanonReq> }
 
-  // Step 1: matrix score (same formula as backend build_decision_matrix)
+function buildCanon(scorecards: Scorecard[]): Canon {
+  const order: string[] = []
+  const reqs: Record<string, CanonReq> = {}
+  for (const sc of scorecards) {
+    for (const m of sc.requirements_matrix ?? []) {
+      const name = (m.criterion ?? '').trim()
+      if (!name) continue
+      const lc = name.toLowerCase()
+      if (!reqs[lc]) { reqs[lc] = { mandatory: false, byVendor: {} }; order.push(lc) }
+      if (m.is_mandatory) reqs[lc].mandatory = true
+      reqs[lc].byVendor[sc.vendor_name] = Math.max(0, Math.min(1, m.score ?? 0))
+    }
+  }
+  return { order, reqs }
+}
+
+// Deterministic, client-side recompute. Step 1 is the normalized union-matrix score
+// (identical math to backend build_decision_matrix and compatibility_score); the
+// hard penalty is toggleable. Step 2 layers a capped persona bonus so the sliders
+// stay live but can never lift an all-hard-failed vendor above 20.
+function recompute(sc: Scorecard, canon: Canon, weights: Record<Persona, number>, enforceHard: boolean) {
+  if (!canon.order.length) return 0
+
+  // Step 1: matrix score over the canonical (union) requirement set
   let totalWeight = 0, weightedSum = 0
-  for (const m of matrix) {
-    const w = m.is_mandatory ? 2 : 1
-    const raw = m.score ?? 0
-    const value = (m.is_mandatory && enforceHard)
-      ? (raw >= 0.5 ? 1.0 : 0.0)
-      : Math.max(0, Math.min(1, raw))
+  for (const lc of canon.order) {
+    const c = canon.reqs[lc]
+    const w = c.mandatory ? 2 : 1
+    const present = sc.vendor_name in c.byVendor
+    const raw = present ? c.byVendor[sc.vendor_name] : 0
+    const value = !present
+      ? 0
+      : (c.mandatory && enforceHard)
+        ? (raw >= 0.5 ? 1.0 : 0.0)
+        : Math.round(Math.max(0, Math.min(1, raw)) * 100) / 100
     weightedSum += w * value
     totalWeight += w
   }
@@ -106,12 +134,14 @@ export default function InteractiveSummaryPanel({
   const [threshold, setThreshold] = useState(50)        // min score (%) for a requirement to "pass"
   const [enforceHard, setEnforceHard] = useState(true)
 
+  const canon = useMemo(() => buildCanon(scorecards), [scorecards])
+
   const ranked = useMemo(() =>
     scorecards
-      .map(sc => ({ sc, score: recompute(sc, weights, enforceHard) }))
+      .map(sc => ({ sc, score: recompute(sc, canon, weights, enforceHard) }))
       .map(r => ({ ...r, delta: r.score - r.sc.compatibility_score }))
       .sort((a, b) => b.score - a.score),
-    [scorecards, weights, enforceHard],
+    [scorecards, canon, weights, enforceHard],
   )
 
   const dirty = PERSONAS.some(p => weights[p] !== DEFAULT_WEIGHTS[p]) || threshold !== 50 || !enforceHard
