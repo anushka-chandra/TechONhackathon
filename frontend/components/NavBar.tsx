@@ -51,7 +51,7 @@ export default function NavBar() {
     <>
       <header
         className="w-full flex items-center gap-2 px-4 h-14 shrink-0 sticky top-0 z-30"
-        style={{ background: 'var(--nav-bg)', borderBottom: '1px solid var(--nav-border)' }}
+        style={{ background: 'var(--nav-bg)' }}
       >
         {/* Brand */}
         <button onClick={() => router.push('/')} className="flex items-center gap-2 mr-3">

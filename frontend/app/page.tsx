@@ -85,6 +85,7 @@ export default function LandingPage() {
   const router = useRouter()
   const { addChat, updateChat } = useChat()
   const [hasStartedAnalysis, setHasStartedAnalysis] = useState(false)   // landing hero → wizard
+  const [fadingOut, setFadingOut] = useState(false)                    // hero → Step 1 cross-fade
   const [phase, setPhase] = useState<Phase>('intro')
   const [step, setStep] = useState<Step>(1)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
@@ -141,6 +142,20 @@ export default function LandingPage() {
     setHasStartedAnalysis(true)
     setPhase('main')   // skip the orb intro; go straight to the existing Step 1
     setTimeout(() => inputRef.current?.focus(), 600)
+  }
+
+  // Clean cross-fade: fade the hero content out (~300ms) while the right-side orb
+  // pulses as a loading state, swap to Step 1 at the opacity trough, then fade Step 1
+  // in (~300ms). The orb never moves or scales to the centre — no overlays.
+  function startTransition() {
+    if (fadingOut) return
+    setFadingOut(true)
+    setTimeout(() => {
+      setHasStartedAnalysis(true)
+      setPhase('main')
+      setFadingOut(false)                              // triggers the Step 1 fade-in
+      setTimeout(() => inputRef.current?.focus(), 350)
+    }, 300)
   }
 
   // ── Instant local summary ─────────────────────────────────────────
@@ -394,6 +409,8 @@ export default function LandingPage() {
     `step-container ${step === n ? 'step-active' : 'step-hidden'}`
 
   // ── Landing Mode hero (shown before the 3-step wizard) ─────────────
+  let content: React.ReactNode
+
   if (!hasStartedAnalysis) {
     // Neural-network rings of empty nodes around the core (viewBox 0..100)
     const ring = (count: number, radius: number, offset = 0) =>
@@ -404,12 +421,12 @@ export default function LandingPage() {
     const innerNodes = ring(8, 26)
     const outerNodes = ring(14, 42, 0.22)
 
-    return (
-      <div className="relative w-full min-h-screen overflow-hidden fade-in-up" style={{ background: '#050505' }}>
+    content = (
+      <div className="relative w-full min-h-[calc(100vh-3.5rem)] overflow-hidden fade-in-up" style={{ background: '#050505' }}>
         <div className="bg-mesh" />
 
         {/* Two-column hero: copy left, Clarity Decision Core right (y-centered) */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 min-h-screen flex flex-col lg:flex-row items-center gap-12 py-20">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 min-h-[calc(100vh-3.5rem)] flex flex-col lg:flex-row items-center gap-12 py-10">
 
           {/* Left — copy, CTA, metrics */}
           <div className="flex-1 w-full">
@@ -434,7 +451,7 @@ export default function LandingPage() {
             </p>
 
             <button
-              onClick={startAnalysis}
+              onClick={startTransition}
               className="group inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full text-sm font-semibold transition-transform hover:scale-[1.03]"
               style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: '#fff', boxShadow: '0 0 28px rgba(99,102,241,.45)' }}
             >
@@ -448,7 +465,13 @@ export default function LandingPage() {
 
           {/* Right — Clarity Decision Core with orbiting neural network (y-centered) */}
           <div className="flex-1 w-full flex items-center justify-center">
-            <div className="relative" style={{ width: 'min(88vw, 480px)', aspectRatio: '1 / 1' }}>
+            <div
+              role="button"
+              title="Start analysis"
+              onClick={startTransition}
+              className="relative cursor-pointer transition-transform hover:scale-[1.02]"
+              style={{ width: 'min(95vw, 640px)', aspectRatio: '1 / 1' }}
+            >
 
               {/* Rotating neural network (empty nodes + connectors) */}
               <div className="absolute inset-0" style={{ animation: 'orbit-spin 60s linear infinite' }}>
@@ -490,20 +513,22 @@ export default function LandingPage() {
 
               {/* Pulsing rings behind the core */}
               <div className="absolute rounded-full" style={{
-                top: '50%', left: '50%', width: 210, height: 210, transform: 'translate(-50%,-50%)',
+                top: '50%', left: '50%', width: 300, height: 300, transform: 'translate(-50%,-50%)',
                 border: '1px solid rgba(99,102,241,.45)', animation: 'pulse-ring 3.6s ease-out infinite',
               }} />
               <div className="absolute rounded-full" style={{
-                top: '50%', left: '50%', width: 210, height: 210, transform: 'translate(-50%,-50%)',
+                top: '50%', left: '50%', width: 300, height: 300, transform: 'translate(-50%,-50%)',
                 border: '1px solid rgba(56,189,248,.4)', animation: 'pulse-ring 3.6s ease-out 1.8s infinite',
               }} />
 
               {/* Central Clarity orb */}
               <div className="absolute rounded-full"
                 style={{
-                  top: '50%', left: '50%', width: 180, height: 180, transform: 'translate(-50%,-50%)',
+                  top: '50%', left: '50%', width: 250, height: 250, transform: 'translate(-50%,-50%)',
                   background: 'radial-gradient(circle at 32% 26%, #c7d2fe 0%, #818cf8 30%, #4f46e5 62%, #312e81 100%)',
-                  animation: 'breathe 4.5s ease-in-out infinite, core-glow 3.2s ease-in-out infinite',
+                  animation: fadingOut
+                    ? 'breathe 0.9s ease-in-out infinite, core-glow 0.9s ease-in-out infinite'
+                    : 'breathe 4.5s ease-in-out infinite, core-glow 3.2s ease-in-out infinite',
                 }}>
                 {/* rotating conic sheen */}
                 <div className="absolute inset-0 rounded-full" style={{
@@ -516,8 +541,8 @@ export default function LandingPage() {
                   background: 'radial-gradient(circle, rgba(255,255,255,.55), transparent 70%)', filter: 'blur(2px)',
                 }} />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-2xl font-black text-white tracking-tight"
-                    style={{ textShadow: '0 1px 10px rgba(0,0,0,.45)' }}>
+                  <span className="text-4xl font-black text-white tracking-tight"
+                    style={{ textShadow: '0 1px 12px rgba(0,0,0,.5)' }}>
                     Clarity
                   </span>
                 </div>
@@ -527,10 +552,8 @@ export default function LandingPage() {
         </div>
       </div>
     )
-  }
-
-  if (phase === 'intro' || phase === 'expanding') {
-    return (
+  } else if (phase === 'intro' || phase === 'expanding') {
+    content = (
       <div className="relative w-full h-screen flex items-center justify-center overflow-hidden"
         style={{ background: '#050505' }}>
         <div className="bg-mesh" />
@@ -558,9 +581,8 @@ export default function LandingPage() {
         </div>
       </div>
     )
-  }
-
-  return (
+  } else {
+    content = (
     <div className="relative w-full h-full min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center overflow-hidden fade-in-up"
       style={{ background: '#050505' }}>
       <div className="bg-mesh" />
@@ -1123,6 +1145,16 @@ export default function LandingPage() {
           )}
         </>
       )}
+    </div>
+    )
+  }
+
+  // Cross-fade wrapper: this element is stable across the hero → Step 1 swap, so its
+  // opacity eases 1 → 0 (hero out) then 0 → 1 (Step 1 in) with the content swapped at
+  // the invisible trough — a pure, seamless opacity transition. No overlays, no jumps.
+  return (
+    <div style={{ opacity: fadingOut ? 0 : 1, transition: 'opacity 300ms ease' }}>
+      {content}
     </div>
   )
 }

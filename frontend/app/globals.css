@@ -17,9 +17,10 @@
   --background: #050505;
   --foreground: #ffffff;
 
-  /* App-shell theme tokens (flip with html.light) */
-  --app-bg: #0d1117;
-  --nav-bg: #0d1117;
+  /* App-shell theme tokens (flip with html.light).
+     Navbar shares the app background so the toolbar + page are one surface. */
+  --app-bg: #050505;
+  --nav-bg: #050505;
   --nav-border: #21262d;
   --text: #e6edf3;
   --text-dim: #8b949e;
@@ -29,7 +30,7 @@
 
 html.light {
   --app-bg: #f6f8fa;
-  --nav-bg: #ffffff;
+  --nav-bg: #f6f8fa;
   --nav-border: #d0d7de;
   --text: #1f2328;
   --text-dim: #57606a;
