@@ -410,14 +410,19 @@ def run_debate(
     vendor_info: str = "",
     selected_agents: Optional[List[str]] = None,
     vendors: Optional[List[str]] = None,
+    agent_configs: Optional[dict] = None,
 ) -> dict:
     """
     Run the full multi-round boardroom debate.
 
+    `agent_configs` is an optional {agent_id: personality_config} map so each agent
+    debates and evaluates in the company-configured voice.
+
     Returns a dict with: vendors, agents (participants), rounds[], decision{}, powered_by.
     """
     agent_ids = _dedupe_agents(selected_agents)
-    agents = [AGENT_REGISTRY[aid]() for aid in agent_ids]
+    configs = agent_configs or {}
+    agents = [AGENT_REGISTRY[aid](config=configs.get(aid)) for aid in agent_ids]
 
     vendor_list = vendors or _extract_vendors(requirements + " " + vendor_info)
     if len(vendor_list) < 2:

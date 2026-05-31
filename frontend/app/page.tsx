@@ -74,6 +74,55 @@ const colorMap: Record<string, { bg: string; text: string }> = {
   rose:    { bg: 'rgba(244,63,94,.2)',   text: '#fb7185' },
 }
 
+// ── Per-agent personality customization (Step 2) ──────────────────────
+interface AgentConfig {
+  tone: 'formal' | 'direct' | 'friendly' | 'strict'
+  risk: 'low' | 'medium' | 'high'
+  decision: 'conservative' | 'balanced' | 'aggressive'
+  priority: number          // 0 = stability ... 100 = innovation
+  communication: 'concise' | 'detailed'
+}
+const DEFAULT_AGENT_CONFIG: AgentConfig = {
+  tone: 'formal', risk: 'medium', decision: 'balanced', priority: 50, communication: 'detailed',
+}
+const TONE_OPTS = [
+  { v: 'formal', label: 'Formal' }, { v: 'direct', label: 'Direct' },
+  { v: 'friendly', label: 'Friendly' }, { v: 'strict', label: 'Strict' },
+] as const
+const RISK_OPTS = [
+  { v: 'low', label: 'Low' }, { v: 'medium', label: 'Medium' }, { v: 'high', label: 'High' },
+] as const
+const DECISION_OPTS = [
+  { v: 'conservative', label: 'Conservative' }, { v: 'balanced', label: 'Balanced' },
+  { v: 'aggressive', label: 'Aggressive' },
+] as const
+const COMM_OPTS = [
+  { v: 'concise', label: 'Short & factual' }, { v: 'detailed', label: 'Detailed' },
+] as const
+
+// Small segmented-button control used by the customization panel
+function Seg<T extends string>({ options, value, onChange }: {
+  options: readonly { v: T; label: string }[]; value: T; onChange: (v: T) => void
+}) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {options.map(o => {
+        const active = o.v === value
+        return (
+          <button key={o.v} type="button" onClick={() => onChange(o.v)}
+            className="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors"
+            style={{
+              background: active ? '#4f46e5' : 'rgba(255,255,255,.06)',
+              color: active ? '#fff' : '#9ca3af', border: '1px solid rgba(255,255,255,.12)',
+            }}>
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 const SpinnerIcon = () => (
   <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -90,6 +139,10 @@ export default function LandingPage() {
   const [step, setStep] = useState<Step>(1)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [selectedAgents, setSelectedAgents] = useState<Set<AgentId>>(new Set())
+  const [agentConfigs, setAgentConfigs] = useState<Record<AgentId, AgentConfig>>(
+    () => Object.fromEntries(ALL_AGENTS.map(id => [id, { ...DEFAULT_AGENT_CONFIG }])) as Record<AgentId, AgentConfig>,
+  )
+  const [expandedAgent, setExpandedAgent] = useState<AgentId | null>(null)
   const [requirements, setRequirements] = useState('')
   const [actionLoading, setActionLoading] = useState<'upload' | 'search' | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -255,10 +308,14 @@ export default function LandingPage() {
     setTimeout(() => setStep(3), 200)
     // Save step 2 to backend
     if (sessionId) {
+      // Only persist configs for the agents actually on the board
+      const configs = Object.fromEntries(
+        Array.from(selectedAgents).map(id => [id, agentConfigs[id]]),
+      )
       fetch(`/api/py/sessions/${sessionId}/step2`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agents: Array.from(selectedAgents) }),
+        body: JSON.stringify({ agents: Array.from(selectedAgents), configs }),
       }).catch(() => {})
     }
   }
@@ -276,6 +333,10 @@ export default function LandingPage() {
     setSelectedAgents(prev =>
       prev.size === ALL_AGENTS.length ? new Set() : new Set(ALL_AGENTS)
     )
+  }
+
+  function updateConfig(id: AgentId, patch: Partial<AgentConfig>) {
+    setAgentConfigs(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }))
   }
 
   // ── Step 3: navigate to the live debate, carrying session_id along ──
@@ -954,26 +1015,73 @@ export default function LandingPage() {
             const meta = AGENT_META[id]
             const c = colorMap[meta.color]
             const isSelected = selectedAgents.has(id)
+            const cfg = agentConfigs[id]
+            const open = expandedAgent === id
             return (
-              <button
+              <div
                 key={id}
-                className={`agent-card w-full text-left p-4 rounded-2xl flex items-center gap-4 group transition-all${isSelected ? ' selected' : ''}`}
+                className={`agent-card rounded-2xl group transition-all${isSelected ? ' selected' : ''}`}
                 style={{ border: '1px solid rgba(55,65,81,.5)', background: 'rgba(255,255,255,.05)' }}
-                onClick={() => toggleAgent(id)}
               >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                  style={{ background: c.bg, color: c.text }}>
-                  {meta.icon}
+                {/* Header — click to select/deselect */}
+                <div className="p-4 flex items-center gap-4 cursor-pointer" onClick={() => toggleAgent(id)}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                    style={{ background: c.bg, color: c.text }}>
+                    {meta.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium" style={{ color: '#e5e7eb' }}>{meta.label}</div>
+                    <div className="text-xs" style={{ color: '#9ca3af' }}>{meta.sub}</div>
+                  </div>
+                  <div className="ml-auto flex items-center gap-2 shrink-0">
+                    <button type="button"
+                      onClick={e => { e.stopPropagation(); setExpandedAgent(open ? null : id) }}
+                      className="text-[11px] px-2 py-1 rounded-md font-medium"
+                      style={{ background: open ? 'rgba(129,140,248,.2)' : 'rgba(255,255,255,.06)', color: open ? '#a5b4fc' : '#9ca3af' }}>
+                      {open ? 'Done' : 'Customize'}
+                    </button>
+                    <div className="w-5 h-5 rounded-full border flex items-center justify-center transition-opacity"
+                      style={{ borderColor: '#6b7280', opacity: isSelected ? 1 : 0 }}>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#818cf8' }} />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-medium" style={{ color: '#e5e7eb' }}>{meta.label}</div>
-                  <div className="text-xs" style={{ color: '#9ca3af' }}>{meta.sub}</div>
-                </div>
-                <div className="ml-auto w-5 h-5 rounded-full border flex items-center justify-center transition-opacity"
-                  style={{ borderColor: '#6b7280', opacity: isSelected ? 1 : 0 }}>
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#818cf8' }} />
-                </div>
-              </button>
+
+                {/* Customization panel */}
+                {open && (
+                  <div className="px-4 pb-4 pt-1 space-y-3" style={{ borderTop: '1px solid rgba(55,65,81,.5)' }}>
+                    <p className="text-[11px] mt-3" style={{ color: '#6b7280' }}>
+                      Keeps its {meta.sub.toLowerCase()} focus — adjust how it behaves:
+                    </p>
+                    <div>
+                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9ca3af' }}>Tone</p>
+                      <Seg options={TONE_OPTS} value={cfg.tone} onChange={v => updateConfig(id, { tone: v })} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9ca3af' }}>Risk tolerance</p>
+                      <Seg options={RISK_OPTS} value={cfg.risk} onChange={v => updateConfig(id, { risk: v })} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9ca3af' }}>Decision style</p>
+                      <Seg options={DECISION_OPTS} value={cfg.decision} onChange={v => updateConfig(id, { decision: v })} />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1" style={{ color: '#9ca3af' }}>
+                        <span className="font-semibold">Priority</span>
+                        <span>Stability ↔ Innovation</span>
+                      </div>
+                      <input type="range" min={0} max={100} step={5} value={cfg.priority}
+                        onChange={e => updateConfig(id, { priority: Number(e.target.value) })}
+                        className="w-full h-1.5 rounded-full cursor-pointer"
+                        style={{ accentColor: '#818cf8', background: '#21262d' }} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9ca3af' }}>Communication</p>
+                      <Seg options={COMM_OPTS} value={cfg.communication} onChange={v => updateConfig(id, { communication: v })} />
+                    </div>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>

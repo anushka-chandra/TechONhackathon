@@ -80,8 +80,11 @@ Browser ──(/api/py/* same-origin proxy)──> Next.js server ──> FastAP
   backend calls. (Exception: `/api/summarize` has its own older proxy route; the requirement
   assistant/summary now use `/api/py/requirement-summary`.)
 - **Session model** (SQLite via SQLAlchemy, `backend/database/`): a `Session` has one-to-one
-  `step1` (requirements text + summary), `step2` (agents JSON), `step3` (method, vendor_names JSON,
-  `vendor_text`). Vendor sources (uploads, AI-found, typed) are ALL stored in `step3.vendor_text` as
+  `step1` (requirements text + summary), `step2` (agents JSON + `configs_json` = per-agent
+  personality), `step3` (method, vendor_names JSON, `vendor_text`). `/api/debate` loads
+  `step2.configs` and passes them to `run_debate` so agents speak in the company's voice (works even
+  with "All perspectives"). Vendor sources (uploads, AI-found, typed) are ALL stored in
+  `step3.vendor_text` as
   `=== Document: <name> ===\n<text>` blocks — one standardized format. Parsing/classification keys
   off these headers.
 - **4-source cap** (`MAX_VENDORS = 4` in `ui/server.py`): counts ALL sources (files + AI + typed)
@@ -118,6 +121,10 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
 - `agents/base_agent.py` — `BaseAgent`: wraps OpenRouter. `evaluate()` (one-shot JSON) and
   `speak()` (debate turn per phase: opening/rebuttal/closing). `_MODEL` from `AGENT_MODEL`. Has
   deterministic fallbacks when the API is down. `_RESPONSE_SCHEMA` and debate schemas defined here.
+  **Personality:** `BaseAgent(config={tone,risk,decision,priority,communication})` →
+  `_build_style_directive()` appends a "Behavioural Profile" block to `_persona()`, so the company's
+  configured voice applies to BOTH the debate and the one-shot evaluate. (Note: this file now starts
+  with `from __future__ import annotations` — Python 3.9 can't evaluate `X | None` at runtime.)
 - `agents/{ceo,cfo,cto,cso,procurement}_agent.py` — personas. Display `name` = CEO/CFO/CTO/CSO; each
   `SYSTEM_PROMPT` is the user's **latest concise persona** (CEO = long-term direction / competitive
   position / execution at scale; CFO = cost structure / TCO / ROI / fiscal responsibility; CTO =
@@ -129,7 +136,8 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   into the debate; ignore unless asked.
 - `orchestrator.py` — `run_society()` (one-shot, used by `/api/simulate`), `AGENT_REGISTRY`,
   `_pick_winner`, `_extract_vendors`.
-- `debate.py` — the core: `run_debate()` (3 rounds → moderator synth → **scoring drives winner**;
+- `debate.py` — the core: `run_debate(... agent_configs={id:config})` instantiates each agent with
+  its company-set personality. `run_debate()` (3 rounds → moderator synth → **scoring drives winner**;
   the decision **confidence is now `compute_derived_confidence(scorecards, vote_yes, vote_total)`**,
   i.e. an auditable formula, NOT the LLM's self-reported number),
   `extract_vendor_names()` (cap 4, excludes noise), `detect_category()`, `classify_documents()`
@@ -223,13 +231,16 @@ app shell share `--app-bg = #050505` (seamless, no border). Reusable keyframes: 
 
 ## 10. Current state (as of this handover)
 
-**Everything is committed and pushed to `main`. Working tree clean.**
-Latest commit: `32fbf23` (CEO/CFO/CTO/CSO persona rewrite). All frontend work type-checks clean
+Latest pushed commit: `1e19663` (scoring hardening). **Uncommitted (built + verified, type-checks
+clean):** configurable agent personalities — Step 2 "Customize" panel → `step2.configs` →
+`BaseAgent(config=...)` → debate/scoring/report. All frontend work type-checks clean
 (`npx tsc --noEmit` from `frontend/`) and backend features were verified over HTTP/the proxy.
 
 Feature inventory that exists today (all live on `main`):
 - **Landing** — Clarity hero (orb + neural net), opacity cross-fade into the wizard.
-- **3-step wizard** — requirements (+ assistant chatbot), board selection, vendor sources
+- **3-step wizard** — requirements (+ assistant chatbot), board selection (each agent has a
+  **"Customize" panel**: tone / risk / decision style / priority slider / communication — persisted
+  to `step2.configs` and applied to the debate, scoring justifications and report), vendor sources
   (Upload / AI Web Search / Type Details), pre-debate context review with flag/delete + the 4-source
   cap, all sources stored as standard Document blocks.
 - **Debate** — 3-round multi-agent debate, animated playback, collapsible reasoning, moderator synth.

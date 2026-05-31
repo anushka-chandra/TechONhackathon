@@ -7,6 +7,8 @@ If the API is unavailable the agent falls back to a deterministic mock
 so the rest of the pipeline keeps working.
 """
 
+from __future__ import annotations
+
 import json
 import os
 from typing import Optional
@@ -67,6 +69,59 @@ def _format_transcript(transcript: list) -> str:
     return "\n".join(f"- {t['name']}: {t['message']}" for t in recent)
 
 
+# ── Company-configurable personality / decision style ────────────────────────────
+_TONE = {
+    "formal":   "Maintain a formal, professional tone.",
+    "direct":   "Be blunt and direct — get straight to the point.",
+    "friendly": "Be warm, collaborative and approachable in tone.",
+    "strict":   "Be strict and demanding — hold vendors to a high bar.",
+}
+_RISK = {
+    "low":    "You have LOW risk tolerance: strongly prefer proven, low-risk options and flag uncertainty.",
+    "medium": "You have MEDIUM risk tolerance: weigh opportunity against risk evenly.",
+    "high":   "You have HIGH risk tolerance: comfortable backing bold, less-proven bets when the upside is large.",
+}
+_DECISION = {
+    "conservative": "Decide conservatively — favour safety, reversibility and the status quo.",
+    "balanced":     "Decide in a balanced way — weigh upside and downside evenly.",
+    "aggressive":   "Decide aggressively — push for decisive, high-impact moves.",
+}
+_COMM = {
+    "concise":  "Communicate in a short, factual style — terse and to the point.",
+    "detailed": "Communicate in a detailed, narrative style — explain your reasoning.",
+}
+
+
+def _build_style_directive(config: dict) -> str:
+    """Turn a per-agent personality config into a behavioural-profile prompt block.
+    Returns '' when no config is given, so default behaviour is unchanged."""
+    if not config:
+        return ""
+    lines = []
+    if config.get("tone") in _TONE:
+        lines.append(_TONE[config["tone"]])
+    if config.get("risk") in _RISK:
+        lines.append(_RISK[config["risk"]])
+    if config.get("decision") in _DECISION:
+        lines.append(_DECISION[config["decision"]])
+    pr = config.get("priority")
+    if isinstance(pr, (int, float)):
+        if pr >= 65:
+            lines.append("Weight INNOVATION and forward-looking capability more heavily than stability.")
+        elif pr <= 35:
+            lines.append("Weight STABILITY and proven reliability more heavily than novelty.")
+        else:
+            lines.append("Balance innovation and stability roughly equally.")
+    if config.get("communication") in _COMM:
+        lines.append(_COMM[config["communication"]])
+    if not lines:
+        return ""
+    return (
+        "\n\n--- BEHAVIOURAL PROFILE (configured by the company — keep your core domain focus) ---\n"
+        + "\n".join(f"- {ln}" for ln in lines)
+    )
+
+
 class BaseAgent:
     agent_id: str = "base"
     name:     str = "Base Agent"
@@ -78,8 +133,10 @@ class BaseAgent:
         + _RESPONSE_SCHEMA
     )
 
-    def __init__(self) -> None:
+    def __init__(self, config: dict | None = None) -> None:
         self._client = _client()
+        # Optional company-set personality (tone, risk, decision style, priority, comms)
+        self.config = config or {}
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
@@ -111,7 +168,7 @@ class BaseAgent:
         resp = self._client.chat.completions.create(
             model=_MODEL,
             messages=[
-                {"role": "system", "content": self.SYSTEM_PROMPT},
+                {"role": "system", "content": self._persona() + "\n\n" + _RESPONSE_SCHEMA},
                 {"role": "user",   "content": self._build_user_prompt(requirements, vendor_info)},
             ],
             response_format={"type": "json_object"},
@@ -179,8 +236,10 @@ class BaseAgent:
             return self._debate_fallback(phase, vendors)
 
     def _persona(self) -> str:
-        """The agent's character prompt without the evaluation JSON schema."""
-        return self.SYSTEM_PROMPT.replace(_RESPONSE_SCHEMA, "").rstrip()
+        """The agent's character prompt (without the JSON schema), plus any
+        company-configured behavioural profile."""
+        base = self.SYSTEM_PROMPT.replace(_RESPONSE_SCHEMA, "").rstrip()
+        return base + _build_style_directive(self.config)
 
     def _debate_call(
         self, requirements: str, vendor_info: str, transcript: list, phase: str, vendors: list

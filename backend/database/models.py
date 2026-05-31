@@ -99,10 +99,11 @@ class Step1Requirement(Base):
 class Step2AgentBoard(Base):
     __tablename__ = "step2_agent_boards"
 
-    id:           Mapped[int]      = mapped_column(primary_key=True, autoincrement=True)
-    session_id:   Mapped[str]      = mapped_column(ForeignKey("sessions.id"), nullable=False, unique=True)
-    agents_json:  Mapped[str]      = mapped_column(Text, nullable=False)   # JSON-encoded list
-    submitted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_now)
+    id:           Mapped[int]            = mapped_column(primary_key=True, autoincrement=True)
+    session_id:   Mapped[str]            = mapped_column(ForeignKey("sessions.id"), nullable=False, unique=True)
+    agents_json:  Mapped[str]            = mapped_column(Text, nullable=False)   # JSON-encoded list
+    configs_json: Mapped[Optional[str]]  = mapped_column(Text, nullable=True)    # JSON {agent_id: personality}
+    submitted_at: Mapped[datetime]       = mapped_column(DateTime, nullable=False, default=_now)
 
     session: Mapped["Session"] = relationship(back_populates="step2")
 
@@ -115,9 +116,18 @@ class Step2AgentBoard(Base):
     def agents(self, value: list) -> None:
         self.agents_json = json.dumps(value)
 
+    @property
+    def configs(self) -> dict:
+        return json.loads(self.configs_json) if self.configs_json else {}
+
+    @configs.setter
+    def configs(self, value: dict) -> None:
+        self.configs_json = json.dumps(value) if value else None
+
     def to_dict(self) -> dict:
         return {
             "agents":       self.agents,
+            "configs":      self.configs,
             "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
         }
 

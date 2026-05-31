@@ -89,6 +89,7 @@ def save_step2(
     db: DbSession,
     session_id: str,
     agents: List[str],
+    configs: Optional[dict] = None,
 ) -> SessionModel:
     session = db.get(SessionModel, session_id)
     if session is None:
@@ -96,10 +97,14 @@ def save_step2(
 
     if session.step2:
         session.step2.agents = agents
+        if configs is not None:
+            session.step2.configs = configs
         session.step2.submitted_at = _now()
     else:
         step2 = Step2AgentBoard(session_id=session_id)
         step2.agents = agents
+        if configs is not None:
+            step2.configs = configs
         session.step2 = step2
         db.add(step2)
 

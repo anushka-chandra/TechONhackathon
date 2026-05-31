@@ -23,13 +23,17 @@ from multi_agent_system.debate import (
 
 # ── Create / migrate DB on startup ────────────────────────────────────────────
 db_models.Base.metadata.create_all(bind=engine)
-# Add vendor_text column if upgrading from an older DB
-with engine.connect() as _conn:
-    try:
-        _conn.execute(text("ALTER TABLE step3_vendor_inputs ADD COLUMN vendor_text TEXT"))
-        _conn.commit()
-    except Exception:
-        pass  # column already exists
+# Add columns if upgrading from an older DB (idempotent)
+for _ddl in (
+    "ALTER TABLE step3_vendor_inputs ADD COLUMN vendor_text TEXT",
+    "ALTER TABLE step2_agent_boards ADD COLUMN configs_json TEXT",
+):
+    with engine.connect() as _conn:
+        try:
+            _conn.execute(text(_ddl))
+            _conn.commit()
+        except Exception:
+            pass  # column already exists
 
 # Folder for uploaded files
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "backend" / "data" / "uploads"
@@ -234,11 +238,19 @@ def debate(req: SimulateRequest, db: DbSession = Depends(get_db)):
     req.vendors = _resolve_vendors(req, db, vendor_text)   # prefer real vendors from PDFs
     brief = _build_brief(req)
 
+    # Per-agent personality config saved in Step 2 (so agents debate in the company's voice)
+    agent_configs = {}
+    if req.session_id:
+        session = crud.get_session(db, req.session_id)
+        if session and session.step2:
+            agent_configs = session.step2.configs or {}
+
     result = run_debate(
         requirements=brief,
         vendor_info=vendor_text,
         selected_agents=req.selected_agents,
         vendors=req.vendors,
+        agent_configs=agent_configs,
     )
     # Echo back the exact inputs so the UI can show what the agents received
     result["inputs"] = {
@@ -756,6 +768,7 @@ class Step1Body(BaseModel):
 
 class Step2Body(BaseModel):
     agents: List[str]
+    configs: Optional[dict] = None   # {agent_id: {tone, risk, decision, priority, communication}}
 
 class Step3Body(BaseModel):
     method: str
@@ -780,7 +793,7 @@ def save_step1(session_id: str, body: Step1Body, db: DbSession = Depends(get_db)
 @app.post("/api/sessions/{session_id}/step2")
 def save_step2(session_id: str, body: Step2Body, db: DbSession = Depends(get_db)):
     try:
-        session = crud.save_step2(db, session_id, agents=body.agents)
+        session = crud.save_step2(db, session_id, agents=body.agents, configs=body.configs)
     except KeyError:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"session_id": session.id, "status": session.status, "step": 2}
