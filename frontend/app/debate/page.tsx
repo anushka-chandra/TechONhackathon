@@ -2,10 +2,11 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import InteractiveSummaryPanel from '@/components/InteractiveSummaryPanel'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
-  Brain, ChevronDown, AlertTriangle, Trash2, Pencil, Check, Plus, Mail, Copy, BarChart3,
+  Brain, ChevronDown, AlertTriangle, Trash2, Pencil, Check, Plus, Mail, Copy,
 } from 'lucide-react'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -652,24 +653,6 @@ function DebateContent() {
       </header>
 
       <div className="max-w-4xl mx-auto px-5 py-8">
-        {/* Brief banner */}
-        <div className="rounded-xl border p-4 mb-8 flex items-start gap-3"
-          style={{ background: '#161b22', borderColor: '#30363d' }}>
-          <FileText className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#58a6ff' }} />
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#8b949e' }}>
-              The motion before the board
-            </p>
-            <p className="text-sm" style={{ color: '#c9d1d9' }}>
-              {requirementsText || 'Procurement decision'}
-            </p>
-            <p className="text-xs mt-2" style={{ color: '#8b949e' }}>
-              Evaluating <b style={{ color: '#e6edf3' }}>{vendors.join(' vs ')}</b>
-              {data && <> · {data.agents.length} board members in session</>}
-            </p>
-          </div>
-        </div>
-
         {/* Context the agents receive (Step 1 + Step 3) */}
         {contextCard}
 
@@ -749,56 +732,9 @@ function DebateContent() {
               ))}
             </div>
 
-            {/* Compatibility matrix (quantitative, auditable scoring) */}
+            {/* Interactive compatibility matrix + what-if sensitivity simulator */}
             {scorecards.length > 0 && (
-              <div>
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ color: '#e6edf3' }}>
-                  <BarChart3 className="w-5 h-5" style={{ color: '#58a6ff' }} /> Compatibility Matrix
-                  <span className="text-xs font-normal" style={{ color: '#8b949e' }}>· quantitative score</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {[...scorecards].sort((a, b) => b.compatibility_score - a.compatibility_score).map(sc => (
-                    <div key={sc.vendor_name} className="rounded-xl border p-5"
-                      style={{ background: '#161b22', borderColor: sc.vendor_name === dec.winner ? '#3fb950' : '#30363d' }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-sm" style={{ color: '#e6edf3' }}>{sc.vendor_name}</span>
-                        <span className="text-2xl font-black"
-                          style={{ color: sc.compatibility_score >= 60 ? '#3fb950' : sc.compatibility_score >= 35 ? '#d29922' : '#f85149' }}>
-                          {sc.compatibility_score}
-                          <span className="text-xs font-normal" style={{ color: '#8b949e' }}>/100</span>
-                        </span>
-                      </div>
-                      <div className="h-2 rounded-full mb-3" style={{ background: '#21262d' }}>
-                        <div className="h-full rounded-full"
-                          style={{ width: `${sc.compatibility_score}%`,
-                            background: sc.compatibility_score >= 60 ? '#3fb950' : sc.compatibility_score >= 35 ? '#d29922' : '#f85149' }} />
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-3"
-                        style={{ background: sc.hard_constraints_passed ? '#1f4a2a' : '#4a1f1f',
-                          color: sc.hard_constraints_passed ? '#3fb950' : '#f85149' }}>
-                        {sc.hard_constraints_passed ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                        {sc.hard_constraints_passed ? 'Hard constraints passed' : 'Hard constraint failed'}
-                      </span>
-                      <div className="grid grid-cols-4 gap-2 mb-3">
-                        {PERSONA_KEYS.map(p => (
-                          <div key={p} className="text-center rounded-lg py-1.5" style={{ background: '#0d1117' }}
-                            title={sc.persona_alignment?.[p]?.evidence}>
-                            <p className="text-[10px]" style={{ color: '#8b949e' }}>{p}</p>
-                            <p className="text-sm font-bold" style={{ color: '#c9d1d9' }}>
-                              {sc.persona_alignment?.[p]?.score ?? '—'}<span className="text-[9px]" style={{ color: '#6b7280' }}>/5</span>
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                      {sc.analytical_summary?.primary_risk_factor && (
-                        <p className="text-xs" style={{ color: '#8b949e' }}>
-                          <span style={{ color: '#f85149' }}>Risk:</span> {sc.analytical_summary.primary_risk_factor}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <InteractiveSummaryPanel scorecards={scorecards} winner={dec.winner} />
             )}
 
             <div className="flex justify-center flex-wrap gap-3 pt-2">

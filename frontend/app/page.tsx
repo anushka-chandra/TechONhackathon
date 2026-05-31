@@ -103,6 +103,12 @@ export default function LandingPage() {
   const [searchCount, setSearchCount] = useState(3)
   const [searchLoading, setSearchLoading] = useState(false)
 
+  // ── Step 3: manual "type vendor details" modal ─────────────────────
+  const [typeOpen, setTypeOpen] = useState(false)
+  const [typeName, setTypeName] = useState('')
+  const [typeText, setTypeText] = useState('')
+  const [typeLoading, setTypeLoading] = useState(false)
+
   // ── Step 1: requirements assistant chatbot ─────────────────────────
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [assistantInput, setAssistantInput] = useState('')
@@ -364,6 +370,36 @@ export default function LandingPage() {
         setDetectedCategory(data.category ?? '')
       }
     } catch { /* leave list as-is on failure */ }
+  }
+
+  // ── Step 3: open the manual "type vendor details" modal ───────────
+  function openTypeModal() {
+    setTypeName('')
+    setTypeText('')
+    setTypeOpen(true)
+  }
+
+  // ── Step 3: add a typed vendor as a source (same format as uploads) ─
+  async function handleAddTypedVendor() {
+    if (!typeText.trim() || typeLoading || documents.length >= MAX_VENDORS) return
+    setTypeLoading(true)
+    if (sessionId) {
+      try {
+        const res = await fetch(`/api/py/sessions/${sessionId}/add-vendor`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: typeName.trim(), text: typeText.trim() }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data.documents)) setDocuments(data.documents)
+          if (data.category) setDetectedCategory(data.category)
+        }
+      } catch { /* keep whatever is already gathered */ }
+    }
+    setTypeLoading(false)
+    setTypeName('')
+    setTypeText('')   // clear so the user can immediately add another
   }
 
   // ── Keyboard (onKeyDown — onKeyPress removed in React 19) ────────
@@ -663,7 +699,7 @@ export default function LandingPage() {
             combine both if you like. Up to {MAX_VENDORS} sources in total.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {/* Hidden native file picker driven by the Upload card */}
             <input
               ref={fileInputRef}
@@ -723,6 +759,27 @@ export default function LandingPage() {
                   {actionLoading === 'search' ? 'Initializing...' : 'AI Web Search'}
                 </h3>
                 <p className="text-sm" style={{ color: '#9ca3af' }}>Let agents automatically find vendors online.</p>
+              </div>
+            </button>
+
+            {/* Type Details (manual entry) */}
+            <button
+              className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ border: '1px solid rgba(107,114,128,.5)' }}
+              onClick={openTypeModal}
+              disabled={actionLoading !== null || documents.length >= MAX_VENDORS}
+            >
+              <div className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(52,211,153,.1)', color: '#34d399' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-medium text-white mb-2">Type Details</h3>
+                <p className="text-sm" style={{ color: '#9ca3af' }}>Manually enter vendor info if you have no documents.</p>
               </div>
             </button>
           </div>
@@ -1040,6 +1097,92 @@ export default function LandingPage() {
         >
           {searchLoading ? (<><SpinnerIcon /> Searching for vendors…</>) : (<>Find Vendors &amp; Continue</>)}
         </button>
+      </aside>
+
+      {/* ── Manual "type vendor details" modal (Step 3) ───────────────────────── */}
+      <div
+        className="fixed inset-0 z-40"
+        style={{
+          background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)',
+          opacity: typeOpen ? 1 : 0,
+          pointerEvents: typeOpen ? 'auto' : 'none',
+          transition: 'opacity .3s ease',
+        }}
+        onClick={() => !typeLoading && setTypeOpen(false)}
+      />
+      <aside
+        className="glass-panel fixed z-50 flex flex-col rounded-3xl p-6"
+        style={{
+          top: '50%', left: '50%', width: '100%', maxWidth: '480px', maxHeight: '85vh',
+          transform: typeOpen ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.94)',
+          opacity: typeOpen ? 1 : 0,
+          pointerEvents: typeOpen ? 'auto' : 'none',
+          transition: 'transform .35s cubic-bezier(.16,1,.3,1), opacity .3s ease',
+        }}
+      >
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-xl font-medium">Enter vendor details</h2>
+          <button onClick={() => setTypeOpen(false)} className="p-2 rounded-full" style={{ color: '#9ca3af' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+        <p className="text-sm mb-4" style={{ color: '#9ca3af' }}>
+          No documents? Type the vendor&rsquo;s details below. Each entry is added as a separate
+          vendor source (up to {MAX_VENDORS} total) and is evaluated exactly like an uploaded file.
+        </p>
+
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
+          Vendor name <span style={{ color: '#6b7280' }}>(optional)</span>
+        </label>
+        <input
+          value={typeName}
+          onChange={e => setTypeName(e.target.value)}
+          placeholder="e.g. Acme PM Suite"
+          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mb-4"
+          style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
+        />
+
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
+          Type vendor details here
+        </label>
+        <textarea
+          value={typeText}
+          onChange={e => setTypeText(e.target.value)}
+          rows={6}
+          placeholder="Pricing, key features, integrations, security/compliance, hosting, support… anything the board should weigh."
+          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-y mb-2"
+          style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
+        />
+
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs" style={{ color: '#6b7280' }}>
+            {documents.length} / {MAX_VENDORS} sources gathered
+          </span>
+          {documents.length >= MAX_VENDORS && (
+            <span className="text-xs" style={{ color: '#fb7185' }}>Limit reached</span>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleAddTypedVendor}
+            disabled={!typeText.trim() || typeLoading || documents.length >= MAX_VENDORS}
+            className="flex-1 p-3 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: '#059669', boxShadow: typeText.trim() && documents.length < MAX_VENDORS ? '0 0 15px rgba(5,150,105,.4)' : 'none' }}
+          >
+            {typeLoading ? (<><SpinnerIcon /> Adding…</>) : (<>+ Add vendor</>)}
+          </button>
+          <button
+            onClick={() => setTypeOpen(false)}
+            className="px-4 p-3 rounded-xl text-sm font-medium"
+            style={{ background: '#1f2937', color: '#e5e7eb' }}
+          >
+            Done
+          </button>
+        </div>
       </aside>
 
       {/* ── Requirements assistant chatbot (Step 1) ───────────────────────────── */}

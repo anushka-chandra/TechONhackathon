@@ -4,16 +4,17 @@ import requests as http
 from pathlib import Path
 from sqlalchemy import text
 
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 from sqlalchemy.orm import Session as DbSession
 
 from backend.database.engine import engine, get_db
 from backend.database import models as db_models
 from backend.database import crud
 from backend.pdf_extractor import extract_text
+from backend.report_generator import build_decision_report_pdf
 from multi_agent_system.orchestrator import run_society
 from multi_agent_system.debate import (
     run_debate, extract_vendor_names, classify_documents, search_vendors, detect_category,
@@ -292,6 +293,51 @@ def negotiate(session_id: str, body: NegotiateBody, db: DbSession = Depends(get_
     return {"category": category, "winner": winner, "drafts": drafts}
 
 
+# ── Formal long-form decision report (PDF) ─────────────────────────────────────
+
+class ReportVendor(BaseModel):
+    id:       str            = ""
+    name:     str
+    scores:   dict           = {}
+    features: List[Any]      = []
+
+class ReportConstraints(BaseModel):
+    budget:         float    = 0
+    timelineMonths: int      = 12
+
+class ReportTranscriptEntry(BaseModel):
+    agent: str
+    role:  str = ""
+    text:  str = ""
+
+class DecisionReportPayload(BaseModel):
+    vendors:     List[ReportVendor]
+    constraints: ReportConstraints           = ReportConstraints()
+    transcript:  List[ReportTranscriptEntry] = []
+
+
+@app.post("/api/decision-report")
+def decision_report(payload: DecisionReportPayload):
+    """
+    Generate the formal, long-form Procurement Decision Report as a downloadable
+    PDF (executive essay + normalized matrix + TCO simulation + evidence log).
+    """
+    if len(payload.vendors) < 2:
+        raise HTTPException(status_code=400, detail="At least two vendors are required")
+
+    data = payload.model_dump()
+    try:
+        pdf = build_decision_report_pdf(data)
+    except Exception as exc:  # pragma: no cover - surfaced to the caller
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {exc}")
+
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="procurement-decision-report.pdf"'},
+    )
+
+
 # ── File upload endpoint ───────────────────────────────────────────────────────
 
 # How much combined vendor text we keep per session (agents truncate further)
@@ -469,6 +515,54 @@ def vendor_search(session_id: str, body: VendorSearchBody, db: DbSession = Depen
         "detected_vendors": detected_vendors,
         "remaining":        remaining - len(found),
     }
+
+
+class TypedVendorBody(BaseModel):
+    name: str = ""
+    text: str
+
+
+@app.post("/api/sessions/{session_id}/add-vendor")
+def add_typed_vendor(session_id: str, body: TypedVendorBody, db: DbSession = Depends(get_db)):
+    """
+    Add a MANUALLY TYPED vendor as a Step 3 source. It is stored in exactly the
+    same document format as uploaded files (=== Document: name === blocks), so the
+    rest of the pipeline (classification, vendor detection, debate) treats it
+    identically. Respects the 4-source cap.
+    """
+    session = crud.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="Vendor details are empty")
+
+    existing_text = (session.step3.vendor_text if session.step3 else "") or ""
+    existing_docs = parse_documents(existing_text)
+    if len(existing_docs) >= MAX_VENDORS:
+        summary = _build_step3_summary(session) if session.step3 else {"documents": [], "detected_vendors": [], "category": ""}
+        return {
+            "session_id": session_id, **summary,
+            "added": False, "message": f"You already have {MAX_VENDORS} sources (the maximum).",
+        }
+
+    name = body.name.strip() or f"Typed vendor {len(existing_docs) + 1}"
+    block = f"=== Document: {name} ===\n{body.text.strip()[:12_000]}"
+    merged = f"{existing_text}\n\n{block}".strip() if existing_text else block
+
+    if not session.step3:
+        try:
+            session = crud.save_step3(db, session_id, method="manual", vendor_names=[])
+        except Exception:
+            pass
+    if session.step3:
+        session.step3.method = "both" if existing_text else "manual"
+        session.step3.vendor_text = merged[:MAX_VENDOR_TEXT]
+        summary = _build_step3_summary(session)
+        db.commit()
+    else:
+        summary = {"documents": [], "detected_vendors": [], "category": ""}
+
+    return {"session_id": session_id, **summary, "added": True}
 
 
 class RemoveDocBody(BaseModel):

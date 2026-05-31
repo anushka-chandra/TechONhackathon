@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+openai
+pypdf
+python-multipart
+requests
+reportlab
