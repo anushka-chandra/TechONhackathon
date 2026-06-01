@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import InteractiveSummaryPanel from '@/components/InteractiveSummaryPanel'
 import SummaryCharts from '@/components/SummaryCharts'
 import DecisionMatrix, { type DecisionMatrixData } from '@/components/DecisionMatrix'
+import { useVapiNegotiator } from '@/hooks/useVapiNegotiator'
+import { useProfile } from '@/context/ProfileContext'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
@@ -175,6 +177,9 @@ function VoteBar({ yes, no }: { yes: number; no: number }) {
 function DebateContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { profile } = useProfile()
+  // Vapi voice negotiator — `loading` aliased to avoid clashing with the page's own `loading` state
+  const { callActive, loading: vapiLoading, startNegotiation, stopNegotiation } = useVapiNegotiator()
 
   const requirements = searchParams.get('requirements') ?? ''
   const sessionId = searchParams.get('session_id') ?? ''
@@ -810,6 +815,45 @@ function DebateContent() {
                 className="px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-2"
                 style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff' }}>
                 <Mail className="w-4 h-4" /> Draft negotiation emails
+              </button>
+              <button
+                onClick={() => {
+                  if (callActive) {
+                    stopNegotiation()
+                  } else {
+                    const vendor = data?.decision?.winner &&
+                      data.decision.winner !== 'NONE'
+                      ? data.decision.winner
+                      : 'the vendor'
+                    const company = profile?.company || 'our organization'
+                    startNegotiation(vendor, '€350/month', '12 months', company)
+                  }
+                }}
+                disabled={vapiLoading}
+                style={{
+                  background: callActive
+                    ? 'linear-gradient(135deg,#4f46e5,#7c3aed)'
+                    : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                  border: callActive ? '2px solid #818cf8' : '2px solid transparent',
+                  color: '#fff',
+                  fontWeight: 700,
+                  padding: '0 24px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  cursor: vapiLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  opacity: vapiLoading ? 0.7 : 1,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {vapiLoading
+                  ? '⏳ Connecting...'
+                  : callActive
+                  ? '🟢 Live Negotiation Active... Click to End'
+                  : '📞 Initiate Voice Negotiations'}
               </button>
             </div>
           </div>
