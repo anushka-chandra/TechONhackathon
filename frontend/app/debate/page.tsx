@@ -5,8 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import InteractiveSummaryPanel from '@/components/InteractiveSummaryPanel'
 import SummaryCharts from '@/components/SummaryCharts'
 import DecisionMatrix, { type DecisionMatrixData } from '@/components/DecisionMatrix'
-import { useVapiNegotiator } from '@/hooks/useVapiNegotiator'
-import { useProfile } from '@/context/ProfileContext'
 import {
   ArrowLeft, Download, FastForward, Loader2, Trophy,
   CheckCircle2, XCircle, Gavel, RefreshCw, Users, FileText,
@@ -177,9 +175,6 @@ function VoteBar({ yes, no }: { yes: number; no: number }) {
 function DebateContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { profile } = useProfile()
-  // Vapi voice negotiator — `loading` aliased to avoid clashing with the page's own `loading` state
-  const { callActive, loading: vapiLoading, startNegotiation, stopNegotiation } = useVapiNegotiator()
 
   const requirements = searchParams.get('requirements') ?? ''
   const sessionId = searchParams.get('session_id') ?? ''
@@ -815,47 +810,6 @@ function DebateContent() {
                 className="px-5 py-3 rounded-full text-sm font-semibold flex items-center gap-2 transition-all hover:scale-[1.03] hover:brightness-110"
                 style={{ background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', boxShadow: '0 8px 22px rgba(124,58,237,.28)' }}>
                 <Mail className="w-4 h-4" /> Draft negotiation emails
-              </button>
-              <button
-                onClick={() => {
-                  if (callActive) {
-                    stopNegotiation()
-                  } else {
-                    const vendor = data?.decision?.winner &&
-                      data.decision.winner !== 'NONE'
-                      ? data.decision.winner
-                      : 'the vendor'
-                    const company = profile?.company || 'our organization'
-                    startNegotiation(vendor, '€350/month', '12 months', company)
-                  }
-                }}
-                disabled={vapiLoading}
-                className="transition-all hover:scale-[1.03] hover:brightness-110 disabled:hover:scale-100"
-                style={{
-                  background: callActive
-                    ? 'linear-gradient(135deg,#7c3aed,#5b21b6)'
-                    : 'linear-gradient(135deg,#8b5cf6,#7c3aed)',
-                  border: callActive ? '2px solid #b794f6' : '2px solid transparent',
-                  color: '#fff',
-                  fontWeight: 600,
-                  padding: '0 24px',
-                  height: '48px',
-                  borderRadius: '9999px',
-                  cursor: vapiLoading ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                  opacity: vapiLoading ? 0.7 : 1,
-                  boxShadow: '0 8px 22px rgba(124,58,237,.28)',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {vapiLoading
-                  ? '⏳ Connecting...'
-                  : callActive
-                  ? '🟢 Live Negotiation Active... Click to End'
-                  : '📞 Initiate Voice Negotiations'}
               </button>
             </div>
           </div>

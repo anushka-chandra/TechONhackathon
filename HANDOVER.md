@@ -274,8 +274,8 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   (What-If). Also: print-to-PDF report overlay (`#decision-report`, includes a print-variant
   DecisionMatrix) and the negotiation modal. (The old "Motion before the board" banner was removed.)
   Reads `data.decision_matrix` / `data.scorecards` from the debate response. The action row under the
-  Summary has THREE buttons: "Download Decision Report", "Draft negotiation emails", and **"📞 Initiate
-  Voice Negotiations"** (Vapi live WebRTC call — see Hooks below).
+  Summary has TWO buttons: "Download Decision Report" and "Draft negotiation emails". (A third "Initiate
+  Voice Negotiations" / Vapi button was removed — see Hooks below.)
 - `app/dashboard/page.tsx` — older simulator view (still reachable, not in main flow).
 - `app/projects/page.tsx`, `app/settings/page.tsx` — from the navbar.
 
@@ -291,17 +291,12 @@ longer imported).
 toggles `html.light`), `ProfileContext` (company info in localStorage — `useProfile()` → `profile.company`).
 All wrap the app in `app/layout.tsx`.
 
-**Hooks**: `hooks/useVapiNegotiator.ts` — wraps the **Vapi WebRTC voice negotiator** (`@vapi-ai/web`,
-lazy-loaded client-side only). Returns `{ callActive, loading, startNegotiation, stopNegotiation }`.
-`startNegotiation(vendor, budget, duration, company)` starts a live call where the AI agent ("Sarah")
-negotiates pricing — seeds `firstMessage` + `assistantOverrides.variableValues`. Used by the debate
-page's "Initiate Voice Negotiations" button: vendor = `decision.winner` (or "the vendor" when NONE),
-company = `profile?.company || 'our organization'`, budget/duration currently **hardcoded**
-(`'€350/month'` / `'12 months'` — TODO: drive from requirements). NOTE the page already has a `loading`
-state, so the hook's `loading` is destructured as `vapiLoading` there. Config: `NEXT_PUBLIC_VAPI_PUBLIC_KEY`
-+ `NEXT_PUBLIC_VAPI_ASSISTANT_ID` in `frontend/.env.local` (gitignored via `frontend/.gitignore` `.env*`).
-The assistant id is committed in code/handover; the **public key must be filled into `.env.local`** and
-the dev server restarted (`NEXT_PUBLIC_*` is read at build/dev-start only).
+**Hooks**: ~~`hooks/useVapiNegotiator.ts` (Vapi WebRTC voice negotiator)~~ — **REMOVED** (the feature
+was buggy and cut before the demo). Deleted the hook, the "Initiate Voice Negotiations" button on the
+debate page, the `useVapiNegotiator`/`useProfile` imports + hook call, and the `NEXT_PUBLIC_VAPI_*` vars
+from `frontend/.env.local`. The `@vapi-ai/web` dep may still be in `package.json` (harmless; remove with
+`npm uninstall @vapi-ai/web`). If re-adding voice later, the SDK call is `vapi.start(assistantId,
+{ firstMessage, variableValues })` — the second arg must NOT nest an `assistantOverrides` key (Vapi 400s).
 
 **Styling**: **ORCHID light theme** (redesigned this session — the whole app was flipped from the old
 dark palette to a clean white/orchid-purple/soft-yellow look). Base = white `#ffffff` / very light
@@ -363,10 +358,9 @@ Everything is committed/pushed to `main`. Most recent work (this session):
 5. **Hard-constraint pre-screen before the debate** — `_prescreen_vendors` + a 3-path
    (WORST/MIDDLE/BEST) flow in `run_debate`, incl. a single-eligible-vendor short-circuit and a
    blue/purple "pre-selected winner" banner on the debate page (full details in §6).
-6. **Vapi WebRTC voice negotiator** (frontend-only, `1742503`) — `hooks/useVapiNegotiator.ts` +
-   "Initiate Voice Negotiations" button on the debate page; "Sarah" AI calls the winning vendor live to
-   negotiate pricing. Needs the public key filled into `frontend/.env.local` (§8 Hooks). `@vapi-ai/web`
-   2.5.2 added to `frontend/package.json`.
+6. ~~**Vapi WebRTC voice negotiator**~~ — **REMOVED** (was added in `1742503`, cut before the demo
+   because it didn't work). Hook + button + env vars deleted; the debate action row now has two buttons.
+   `@vapi-ai/web` may linger in `package.json` (harmless — `npm uninstall @vapi-ai/web` to drop it).
 **OpenRouter wallet is topped up again — live AI calls work** (verified 2026-06-01, HTTP 200; §11), so
 the AI path can now be exercised end-to-end. Configurable agent personalities (`ab166d7`) and the NONE
 backend signal (`c6031e2`) are also on `main`.
@@ -418,11 +412,8 @@ When you make new changes, update this section (and the rest of this file) accor
 - **Language** setting is a stored preference only — no i18n strings are wired (UI stays English).
 - **Profile/sign-in** is localStorage only — no real auth backend.
 - **Negotiation email lookup** may hallucinate plausible addresses — UI tells the user to verify.
-- **Vapi voice negotiator** is wired but needs setup to actually dial: `NEXT_PUBLIC_VAPI_PUBLIC_KEY`
-  must be filled into `frontend/.env.local` (placeholder `FILL_IN_BY_USER` by default) and the dev
-  server restarted. Budget/duration passed to the agent are **hardcoded** (`€350/month` / `12 months`),
-  not yet derived from the actual requirements. Live calls require mic permission + a funded Vapi
-  account (telephony/usage is billed separately from OpenRouter).
+- **Vapi voice negotiator** was **removed** (cut before the demo — it kept 400ing and wasn't working).
+  See §8 Hooks / §10 item 6.
 - `:online` web search adds a small per-search $ surcharge (drove the $ spend up vs token count).
 - OpenRouter: **the wallet has been topped up — live API calls work again** (verified 2026-06-01: a
   real `chat/completions` call returned HTTP 200 and billed ~$0.0000028; the earlier
