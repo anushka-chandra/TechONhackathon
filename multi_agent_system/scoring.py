@@ -240,6 +240,45 @@ def _one_sentence(text: str, limit: int = 200) -> str:
     return (first + ".")[:limit]
 
 
+def _bucket_criterion(raw: str) -> str:
+    """
+    Map criterion names to canonical buckets so that semantically identical
+    requirements from different vendor scorecards merge into one matrix row.
+    Strips noise then checks for known concept keywords.
+    """
+    import re
+    s = re.sub(r'[^a-z0-9]', '', raw.lower())
+    # Budget — any mention of budget/cost/price/spend
+    if any(k in s for k in ('budget', 'cost', 'price', 'spend', 'month', 'subscription')):
+        return 'budget'
+    # Team size — any mention of team/user/people/seats/capacity
+    if any(k in s for k in ('team', 'user', 'people', 'seat', 'capacity', 'member')):
+        return 'teamsize'
+    # Task boards
+    if any(k in s for k in ('task', 'board', 'kanban', 'card')):
+        return 'taskboards'
+    # File sharing
+    if any(k in s for k in ('file', 'sharing', 'attachment', 'document', 'storage')):
+        return 'filesharing'
+    # Slack integration
+    if any(k in s for k in ('slack', 'integration', 'integrate', 'connect')):
+        return 'slackintegration'
+    # EU hosting
+    if any(k in s for k in ('eu', 'europe', 'host', 'datacenter', 'gdpr', 'residency')):
+        return 'euhosting'
+    # Mobile app
+    if any(k in s for k in ('mobile', 'app', 'ios', 'android')):
+        return 'mobileapp'
+    # SSO / auth
+    if any(k in s for k in ('sso', 'auth', 'saml', 'oauth', 'signin', 'login')):
+        return 'sso'
+    # Security / compliance
+    if any(k in s for k in ('security', 'compliance', 'cert', 'soc', 'iso', 'audit')):
+        return 'security'
+    # Fall back to the alphanumeric stripped version
+    return s
+
+
 def build_decision_matrix(scorecards: List[dict]) -> dict:
     """
     Build one normalized, mathematically-grounded purchase-decision matrix across
@@ -264,8 +303,7 @@ def build_decision_matrix(scorecards: List[dict]) -> dict:
             if not crit:
                 continue
             lc = crit.lower()
-            import re
-            lc = re.sub(r'[^a-z0-9]', '', lc)
+            lc = _bucket_criterion(crit)
             if lc not in canon:
                 canon[lc] = {"name": crit, "mandatory": False, "raw": {}}
                 order.append(lc)
