@@ -21,6 +21,8 @@ interface Round { phase: string; label: string; turns: Turn[] }
 interface Decision {
   winner: string; runner_up: string; confidence: number
   all_constraints_failed?: boolean
+  pre_selected_winner?: string
+  pre_screen_results?: Record<string, number>
   vote_summary: { yes: number; no: number; total: number }
   summary: string; justification: string
   pros: Record<string, string[]>; cons: Record<string, string[]>
@@ -680,6 +682,26 @@ function DebateContent() {
         {/* ── Final decision — surfaced on top once the board concludes ── */}
         {done && dec && (
           <div ref={decisionRef} className="turn-in space-y-6 mb-8">
+            {/* Pre-screen confirmation — a single vendor cleared all hard constraints up front */}
+            {dec.pre_selected_winner && (
+              <div className="rounded-2xl border p-5 text-center"
+                style={{
+                  background: 'linear-gradient(135deg,#1a1a3a,#12122a)',
+                  borderColor: '#818cf8', boxShadow: '0 0 30px rgba(129,140,248,.15)',
+                }}>
+                <p className="text-sm font-semibold flex items-center justify-center gap-2" style={{ color: '#c7d2fe' }}>
+                  <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#818cf8' }} />
+                  <span>
+                    Clear winner detected before debate — <b style={{ color: '#a5b4fc' }}>{dec.pre_selected_winner}</b>{' '}
+                    passed all hard constraints at pre-screening.
+                    {(data?.rounds?.length ?? 0) > 0
+                      ? ' The debate below confirms this recommendation.'
+                      : ' No debate was needed — it was the only vendor to clear the hard requirements.'}
+                  </span>
+                </p>
+              </div>
+            )}
+
             {/* Winner banner */}
             {dec.all_constraints_failed ? (
               <div className="rounded-2xl border p-8 text-center"

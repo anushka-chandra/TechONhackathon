@@ -137,7 +137,25 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
 - `orchestrator.py` — `run_society()` (one-shot, used by `/api/simulate`), `AGENT_REGISTRY`,
   `_pick_winner`, `_extract_vendors`.
 - `debate.py` — the core: `run_debate(... agent_configs={id:config})` instantiates each agent with
-  its company-set personality. `run_debate()` (3 rounds → moderator synth → **scoring drives winner**;
+  its company-set personality. **PRE-SCREEN (before any debate):** `_prescreen_vendors()` does one
+  cheap LLM call that checks each vendor's docs against ONLY the hard/mandatory requirements and
+  returns `{vendor: pass_rate}` (0–1 fraction of hard constraints passed; falls back to 1.0 for all on
+  any error so the debate proceeds). `run_debate` then branches on `HARD_PASS_THRESHOLD = 0.70`:
+  • **WORST** — every vendor's rate is 0.0 → skip the debate entirely, return `winner="NONE"`,
+  `all_constraints_failed=True`, `decision.pre_screened=True`, `powered_by="pre_screen"`, empty
+  rounds/scorecards (the frontend's red "No Vendor Qualifies" banner already covers this).
+  • **MIDDLE** — keep only vendors with `rate ≥ 0.70` (if none hit 0.70, relax to the single best rate)
+  and debate just those. • **SINGLE eligible vendor** (after filtering) → no debate (one-sided is
+  meaningless): return it as `winner`, `confidence = round(rate*100)`, `powered_by="pre_screen"`. •
+  **BEST** — exactly one vendor passes ALL hard constraints (rate 1.0) → `decision.pre_selected_winner
+  = that vendor` (the rest of the debate still runs to justify it). Every non-WORST return now carries
+  `decision.pre_selected_winner` (str|null) and `decision.pre_screen_results` ({vendor: rate}); the
+  frontend shows a blue/purple "clear winner detected before debate" banner above the green winner
+  banner when `pre_selected_winner` is set (its second sentence adapts to whether a debate actually
+  ran). NOTE: the 0.70 threshold means a vendor that FAILS up to 30% of hard constraints can still be
+  the sole-eligible winner via the pre-screen path (which skips the strict per-constraint gating that
+  the full scoring/`build_decision_matrix` path applies) — a deliberate tradeoff, flagged here.
+  `run_debate()` (3 rounds → moderator synth → **scoring drives winner**;
   the decision **confidence is now `compute_derived_confidence(scorecards, vote_yes, vote_total)`**,
   i.e. an auditable formula, NOT the LLM's self-reported number; if EVERY vendor fails a hard
   constraint, `decision.winner = "NONE"`, `confidence = 0`, and `decision.all_constraints_failed =
@@ -282,7 +300,11 @@ Everything is committed/pushed to `main`. Most recent work (this session):
    matrix showed that vendor's hard constraint FAILED.
 4. **Scoring robustness** — `score_vendor` `max_tokens` 1100→2500 (avoid truncated-JSON fallback),
    logs `[score_vendor] fallback for <vendor>: <err>` to stderr, and `_fallback_card` now reports
-   `hard_constraints_passed=False`.
+   `hard_constraints_passed=False`. Plus a scope rule (`SCORING_SYSTEM_PROMPT` rule 5) — score only
+   user-requested requirements, ignore unrequested vendor features.
+5. **Hard-constraint pre-screen before the debate** — `_prescreen_vendors` + a 3-path
+   (WORST/MIDDLE/BEST) flow in `run_debate`, incl. a single-eligible-vendor short-circuit and a
+   blue/purple "pre-selected winner" banner on the debate page (full details in §6).
 **OpenRouter wallet is topped up again — live AI calls work** (verified 2026-06-01, HTTP 200; §11), so
 the AI path can now be exercised end-to-end. Configurable agent personalities (`ab166d7`) and the NONE
 backend signal (`c6031e2`) are also on `main`.

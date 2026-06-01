@@ -405,6 +405,62 @@ def _synth_fallback(vendors: List[str], transcript: List[dict], winner: str) -> 
     }
 
 
+def _prescreen_vendors(
+    vendor_list: List[str],
+    requirements: str,
+    vendor_info: str,
+) -> dict[str, float]:
+    """
+    Quick pre-debate hard-constraint check.
+    For each vendor, asks the LLM to check ONLY the hard constraints from
+    the requirements against the vendor documents (no transcript needed).
+    Returns {vendor_name: pass_rate} where pass_rate is 0.0-1.0
+    (fraction of hard constraints passed).
+    Falls back to 1.0 for all vendors if the call fails (safe default —
+    let the debate proceed normally).
+    """
+    if not vendor_list or not requirements.strip():
+        return {v: 1.0 for v in vendor_list}
+    try:
+        resp = _client().chat.completions.create(
+            model=_MODEL,
+            messages=[
+                {"role": "system", "content":
+                    "You are a procurement pre-screening engine. You check vendor "
+                    "documents against ONLY the hard (mandatory) requirements stated "
+                    "by the user. Soft/preferred requirements are ignored entirely."},
+                {"role": "user", "content": (
+                    f"User requirements:\n{requirements[:3000]}\n\n"
+                    f"Vendor documents:\n{vendor_info[:8000]}\n\n"
+                    f"Vendors to screen: {', '.join(vendor_list)}\n\n"
+                    "For each vendor, identify ONLY the hard/mandatory requirements "
+                    "from the user requirements (words like 'must', 'required', "
+                    "'max', 'only'). Check how many each vendor passes based solely "
+                    "on evidence in their document. "
+                    "Return JSON only: "
+                    '{"results": [{"vendor": "name", "hard_total": 5, '
+                    '"hard_passed": 3, "pass_rate": 0.6}]}'
+                )},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=400,
+            temperature=0,
+        )
+        data = json.loads(resp.choices[0].message.content)
+        out = {}
+        for r in data.get("results", []):
+            name = str(r.get("vendor", "")).strip()
+            rate = float(r.get("pass_rate", 1.0))
+            if name in vendor_list:
+                out[name] = max(0.0, min(1.0, rate))
+        # Fill any missing vendors with 1.0 (safe default)
+        for v in vendor_list:
+            out.setdefault(v, 1.0)
+        return out
+    except Exception:
+        return {v: 1.0 for v in vendor_list}
+
+
 def run_debate(
     requirements: str,
     vendor_info: str = "",
@@ -427,6 +483,78 @@ def run_debate(
     vendor_list = vendors or _extract_vendors(requirements + " " + vendor_info)
     if len(vendor_list) < 2:
         vendor_list = (vendor_list + ["Alternative Option"])[:2]
+
+    pre_selected_winner = None
+    pre_screen_results = {}
+
+    # ── Pre-screen: check hard constraints before running the debate ────────────
+    HARD_PASS_THRESHOLD = 0.70  # vendor must pass ≥70% of hard constraints to debate
+    prescreens = _prescreen_vendors(vendor_list, requirements, vendor_info)
+
+    # WORST CASE: no vendor passes even one hard constraint → skip debate entirely
+    if all(rate == 0.0 for rate in prescreens.values()):
+        return {
+            "vendors":  vendor_list,
+            "agents":   [],
+            "rounds":   [],
+            "decision": {
+                "winner":                 "NONE",
+                "runner_up":              "",
+                "confidence":             0,
+                "all_constraints_failed": True,
+                "pre_screened":           True,
+                "vote_summary":           {"yes": 0, "no": 0, "total": 0},
+                "summary":                "No vendor passed any hard constraint. Review your requirements or find different vendors.",
+                "justification":          "Pre-screening eliminated all vendors before the debate.",
+                "pros":                   {v: [] for v in vendor_list},
+                "cons":                   {v: [] for v in vendor_list},
+            },
+            "scorecards":      [],
+            "decision_matrix": {"vendors": vendor_list, "requirements": [], "totals": {}, "ranking": [], "explanation": ""},
+            "powered_by":      "pre_screen",
+        }
+
+    # BEST CASE: one vendor passes ALL hard constraints → flag it, still debate for justification
+    perfect_vendors = [v for v, rate in prescreens.items() if rate == 1.0]
+    pre_selected_winner = perfect_vendors[0] if len(perfect_vendors) == 1 else None
+
+    # MIDDLE CASE: filter to vendors passing ≥70% of hard constraints
+    eligible = [v for v, rate in prescreens.items() if rate >= HARD_PASS_THRESHOLD]
+    if not eligible:
+        # No vendor hits 70% — relax to best available rather than empty debate
+        best_rate = max(prescreens.values())
+        eligible = [v for v, rate in prescreens.items() if rate == best_rate]
+    vendor_list = eligible  # debate only among eligible vendors
+
+    # Store pre-screen results to include in the response
+    pre_screen_results = prescreens
+
+    # SINGLE ELIGIBLE VENDOR: a one-sided debate is meaningless — return it directly as
+    # the winner, with confidence derived from its pre-screen hard-constraint pass rate.
+    if len(vendor_list) == 1:
+        sole = vendor_list[0]
+        sole_rate = prescreens.get(sole, 1.0)
+        return {
+            "vendors":  vendor_list,
+            "agents":   [],
+            "rounds":   [],
+            "decision": {
+                "winner":                 sole,
+                "runner_up":              "",
+                "confidence":             round(sole_rate * 100),
+                "all_constraints_failed": False,
+                "pre_selected_winner":    pre_selected_winner,
+                "pre_screen_results":     pre_screen_results,
+                "vote_summary":           {"yes": 0, "no": 0, "total": 0},
+                "summary":                f"{sole} was the only vendor to clear the hard-constraint pre-screen ({round(sole_rate * 100)}% of mandatory requirements passed), so it is recommended without a debate — a one-sided debate would add no information.",
+                "justification":          f"Pre-screening left {sole} as the sole eligible vendor.",
+                "pros":                   {v: [] for v in vendor_list},
+                "cons":                   {v: [] for v in vendor_list},
+            },
+            "scorecards":      [],
+            "decision_matrix": {"vendors": vendor_list, "requirements": [], "totals": {}, "ranking": [], "explanation": ""},
+            "powered_by":      "pre_screen",
+        }
 
     # ── Run the rounds ──────────────────────────────────────────────────────────
     transcript: List[dict] = []
@@ -512,6 +640,8 @@ def run_debate(
             "runner_up":             runner_up,
             "confidence":            confidence,
             "all_constraints_failed": all_constraints_failed,
+            "pre_selected_winner":   pre_selected_winner,
+            "pre_screen_results":    pre_screen_results,
             "vote_summary":          {"yes": len(yes_votes), "no": len(no_votes), "total": len(closing)},
             "summary":               synth["summary"],
             "justification":         synth["justification"],
