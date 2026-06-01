@@ -159,10 +159,16 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   counts against the others — missing ⇒ 0, missing-mandatory ⇒ fail), hard rows binary 1.0/0.0 at the
   0.5 threshold, soft rows proportional 0–1, weights hard=2/soft=1, normalised. `run_debate`
   (`debate.py`) then **derives everything from that one matrix**: each scorecard's `compatibility_score
-  = round(totals[v]*100)`, the `winner = argmax(compatibility_score)` (== matrix rank #1), and
-  `all_constraints_failed` = "no vendor passes every mandatory matrix row" (identical to the frontend's
-  `noViable`). So the banner winner, the matrix totals, and the per-vendor scorecard number are the
-  exact same numbers and can never contradict. (`_compute_score` is still the same per-row formula but
+  = round(totals[v]*100)`, and the **winner/runner_up are ranked ONLY among QUALIFYING vendors** —
+  those that fail no mandatory matrix row. A vendor that fails a hard constraint can NEVER be crowned,
+  even if its soft score gives it a higher total than a qualifying vendor (this fixed a bug where the
+  banner showed a feasible winner while the matrix showed that vendor's hard constraint FAILED). If no
+  vendor qualifies → `winner="NONE"`, `all_constraints_failed=True`. To keep the matrix's own
+  ranking/trophy/explanation consistent with this, `build_decision_matrix`'s `ranking` now sorts by
+  **(passes_all_hard, total)** so a hard-failed vendor can never be `ranking[0]` (the frontend trophies
+  `ranking[0]` and highlights `winner`, so both now point at the same qualifying vendor). So the banner
+  winner, the matrix totals, and the per-vendor scorecard number are the exact same numbers and can
+  never contradict. (`_compute_score` is still the same per-row formula but
   over a vendor's OWN rows; in the debate path its value is immediately overwritten by the union total.
   The old `(0.5*soft + 0.5*personaNorm)*hardMod` formula is gone.) The frontend What-If simulator
   (`InteractiveSummaryPanel.recompute`) rebuilds the SAME union (`buildCanon`) and computes the same
@@ -175,12 +181,16 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   can fail the other's row — a pre-existing matrix concern, now also reflected in the winner signal.
   Scoring rigor: `SCORING_SYSTEM_PROMPT` starts with an **Evidence-First rule** (rule 0 — no
   evidence in `<vendor_data>` ⇒ soft score 0.0 / mandatory `hard_constraints_passed=false`; never
-  infer features); `score_vendor` runs at **temperature=0** (deterministic) and feeds up to **10k**
-  chars each of vendor_data and the transcript. `score_vendor` also runs a cheap
+  infer features); `score_vendor` runs at **temperature=0** (deterministic), feeds up to **10k**
+  chars each of vendor_data and the transcript, and requests **`max_tokens=2500`** (bumped from 1100
+  so larger requirement matrices aren't truncated into invalid JSON → fallback). On any exception it
+  logs `[score_vendor] fallback for <vendor>: <err>` to **stderr** then returns `_fallback_card`,
+  which now has **`hard_constraints_passed=False`** (a vendor we couldn't score is treated as NOT
+  passing hard constraints, not silently "passed"). `score_vendor` also runs a cheap
   `_detect_evidence_gaps()` pass first and injects a `<evidence_gaps>` block into the prompt to
-  pre-warn the scorer. `hard_constraints_passed` is **computed in Python** (`all(mandatory rows ≥
-  0.5)`) — the LLM's top-level boolean is NOT trusted; and `_compute_score` defaults the hard
-  modifier to the 0.25× penalty when the flag is missing. `compute_derived_confidence(scorecards, vote_yes, vote_total)` returns an
+  pre-warn the scorer. `hard_constraints_passed` is **computed in Python** in `_normalise_card`
+  (`all(mandatory rows ≥ 0.5)`) — the LLM's top-level boolean is NOT trusted.
+  `compute_derived_confidence(scorecards, vote_yes, vote_total)` returns an
   auditable 10–97 confidence = 0.4·(winner−runner score gap) + 0.3·vote consensus + 0.3·winner score
   (used by `run_debate` for `decision.confidence`).
 
@@ -262,8 +272,17 @@ Everything is committed/pushed to `main`. Most recent work (this session):
    use one weighted formula (see §6); a vendor failing every hard constraint scores 0, and the three
    numbers agree. What-If persona sliders are live again as a capped +0–20 bonus on top of the matrix
    base. Verified deterministically in Python (score == matrix total ×100) and `npx tsc --noEmit` clean.
-Couldn't live-verify the AI path because the OpenRouter wallet is depleted (§11, 402s). Configurable
-agent personalities (`ab166d7`) and the NONE backend signal (`c6031e2`) are also on `main`.
+3. **Winner gated by hard constraints** — winner/runner_up are ranked ONLY among qualifying vendors
+   (no failed mandatory row); a hard-failed vendor is never crowned even with a higher soft total, and
+   `build_decision_matrix.ranking` sorts by `(passes_all_hard, total)` so the matrix trophy/explanation
+   agrees with the banner (see §6). Fixed the bug where the banner showed a feasible winner while the
+   matrix showed that vendor's hard constraint FAILED.
+4. **Scoring robustness** — `score_vendor` `max_tokens` 1100→2500 (avoid truncated-JSON fallback),
+   logs `[score_vendor] fallback for <vendor>: <err>` to stderr, and `_fallback_card` now reports
+   `hard_constraints_passed=False`.
+**OpenRouter wallet is topped up again — live AI calls work** (verified 2026-06-01, HTTP 200; §11), so
+the AI path can now be exercised end-to-end. Configurable agent personalities (`ab166d7`) and the NONE
+backend signal (`c6031e2`) are also on `main`.
 
 Feature inventory that exists today (all live on `main`):
 - **Landing** — Clarity hero (orb + neural net), opacity cross-fade into the wizard.

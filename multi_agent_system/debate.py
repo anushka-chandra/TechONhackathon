@@ -462,29 +462,38 @@ def run_debate(
     # and the What-If simulator all use identical math and can never contradict each other.
     decision_matrix = build_decision_matrix(scorecards)
     all_constraints_failed = False
+    runner_up = next((v for v in vendor_list if v != winner), "")
     if scorecards:
         totals = decision_matrix.get("totals", {})
         for sc in scorecards:
             sc["compatibility_score"] = round(totals.get(sc["vendor_name"], 0.0) * 100)
 
-        best_idx = max(range(len(scorecards)), key=lambda i: scorecards[i]["compatibility_score"])
-        winner = vendor_list[best_idx]
         vote_yes = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") == "YES")
         vote_total = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") in ("YES", "NO"))
         confidence = compute_derived_confidence(scorecards, vote_yes, vote_total)
 
         # A vendor "qualifies" iff it fails NO mandatory requirement in the normalized
         # matrix (identical to the frontend DecisionMatrix "no viable vendor" detection).
-        # If none qualify, there is no valid winner — signal it instead of crowning the
-        # least-bad option.
         mandatory_reqs = [r for r in decision_matrix.get("requirements", []) if r.get("mandatory")]
+        scores_by_vendor = {sc["vendor_name"]: sc["compatibility_score"] for sc in scorecards}
 
         def _qualifies(v: str) -> bool:
             return all(not r["scores"].get(v, {}).get("failed", False) for r in mandatory_reqs)
 
-        all_constraints_failed = bool(mandatory_reqs) and not any(_qualifies(v) for v in vendor_list)
-        if all_constraints_failed:
+        # The winner MUST pass every hard constraint. Rank ONLY among qualifying vendors —
+        # never crown a vendor that failed a mandatory requirement just because its soft
+        # score is high. If none qualify, there is no valid recommendation (NONE).
+        qualifying = sorted(
+            (v for v in vendor_list if _qualifies(v)),
+            key=lambda v: scores_by_vendor.get(v, 0), reverse=True,
+        )
+        if qualifying:
+            winner = qualifying[0]
+            runner_up = qualifying[1] if len(qualifying) > 1 else ""
+        else:
+            all_constraints_failed = True
             winner = "NONE"
+            runner_up = ""
             confidence = 0
 
     synth = _synthesize(requirements, vendor_list, transcript, winner, confidence)
@@ -500,7 +509,7 @@ def run_debate(
         "rounds":   rounds,
         "decision": {
             "winner":                winner,
-            "runner_up":             next((v for v in vendor_list if v != winner), ""),
+            "runner_up":             runner_up,
             "confidence":            confidence,
             "all_constraints_failed": all_constraints_failed,
             "vote_summary":          {"yes": len(yes_votes), "no": len(no_votes), "total": len(closing)},

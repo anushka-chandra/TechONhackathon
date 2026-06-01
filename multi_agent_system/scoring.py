@@ -144,7 +144,7 @@ def _compute_score(card: dict) -> int:
 def _fallback_card(vendor_name: str) -> dict:
     return {
         "vendor_name":             vendor_name,
-        "hard_constraints_passed": True,
+        "hard_constraints_passed": False,
         "requirements_matrix":     [],
         "persona_alignment":       {p: {"score": 3, "evidence": "Scoring engine unavailable."} for p in _PERSONAS},
         "analytical_summary": {
@@ -212,11 +212,13 @@ def score_vendor(vendor_name: str, requirements: str, vendor_data: str, transcri
                 {"role": "user",   "content": user},
             ],
             response_format={"type": "json_object"},
-            max_tokens=1100,
+            max_tokens=2500,
             temperature=0,
         )
         card = _normalise_card(json.loads(resp.choices[0].message.content), vendor_name)
-    except Exception:
+    except Exception as e:
+        import sys
+        print(f"[score_vendor] fallback for {vendor_name}: {e}", file=sys.stderr)
         card = _fallback_card(vendor_name)
 
     card["compatibility_score"] = _compute_score(card)
@@ -304,9 +306,16 @@ def build_decision_matrix(scorecards: List[dict]) -> dict:
             "justification": justification[:240],
         })
 
+    # Hard constraints gate the ranking: a vendor that fails any mandatory requirement
+    # can NEVER outrank one that passes them all, regardless of its soft score. Sort by
+    # (passes_all_hard, total) so the top of the matrix is always a qualifying vendor —
+    # keeping the matrix ranking/trophy consistent with the banner winner.
+    def _passes_hard(v: str) -> bool:
+        return not any(r["scores"][v]["failed"] for r in requirements if r["mandatory"])
+
     ranking = sorted(
         ({"vendor": v, "total": round(totals[v], 3)} for v in vendors),
-        key=lambda x: x["total"], reverse=True,
+        key=lambda x: (_passes_hard(x["vendor"]), x["total"]), reverse=True,
     )
 
     explanation = ""
