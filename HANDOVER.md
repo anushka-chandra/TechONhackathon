@@ -225,6 +225,26 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   auditable 10–97 confidence = 0.4·(winner−runner score gap) + 0.3·vote consensus + 0.3·winner score
   (used by `run_debate` for `decision.confidence`).
 
+### Determinism / reproducibility (3 tiers — same input ⇒ same decision)
+- **Tier 1 — every `chat.completions.create()` is deterministic:** `temperature=0` + `seed=_SEED` on
+  ALL OpenRouter calls across `base_agent.py`, `debate.py`, `scoring.py`, `server.py`. (The legacy
+  HuggingFace `/api/summarize` call also got `temperature=0`, but no seed/provider — those are
+  OpenRouter-only.) System prompts/personalities are untouched. `_SEED = 42` lives in `base_agent.py`.
+- **Tier 2 — provider pinned:** every OpenRouter call passes `extra_body=_PROVIDER_PIN`
+  (`{"provider": {"allow_fallbacks": False}}`, also in `base_agent.py`) so routing can't swap providers
+  mid-run. NOT hard-pinned to a slug (would risk a wrong-slug error); model routes to `provider="Google"`
+  — to force one, add `"order": ["Google AI Studio"]` (verify the exact slug on the model's OpenRouter
+  page first).
+- **Tier 3 — disk cache** (in `orchestrator.py`): `decision_key(requirements, vendor_info,
+  selected_agents, vendors, agent_configs)` SHA-256s ALL decision-determining inputs (board +
+  personalities included, so a different board invalidates the cache — agent ORDER matters too).
+  `run_debate` and `run_society` are thin cache shells over `_run_debate_impl`/`_run_society_impl`
+  (`cache_get`/`cache_set` → `.cache/<hash>.json`, survives restarts). `search_vendors` is ALSO cached
+  via `search_key(field, requirements, context_docs, count, must_include)` and **sorts found vendors by
+  name** — so a chat "reload" returns the SAME vendors (the `:online` live-web search is the one thing
+  temperature/seed can't pin; caching freezes it). Bypass everything with **`DISABLE_DECISION_CACHE=1`**
+  to force a genuinely fresh run/search. `.cache/` is gitignored.
+
 ---
 
 ## 7. backend/

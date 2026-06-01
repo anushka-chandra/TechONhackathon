@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from typing import List
 
-from multi_agent_system.agents.base_agent import _client, _MODEL
+from multi_agent_system.agents.base_agent import _client, _MODEL, _SEED, _PROVIDER_PIN
 
 
 SCORING_SYSTEM_PROMPT = """\
@@ -181,6 +181,8 @@ def _detect_evidence_gaps(requirements: str, vendor_data: str, vendor_name: str)
             response_format={"type": "json_object"},
             max_tokens=300,
             temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         result = json.loads(resp.choices[0].message.content)
         return [str(g).strip() for g in result.get("gaps", []) if str(g).strip()]
@@ -217,6 +219,8 @@ def score_vendor(vendor_name: str, requirements: str, vendor_data: str, transcri
             response_format={"type": "json_object"},
             max_tokens=2500,
             temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         card = _normalise_card(json.loads(resp.choices[0].message.content), vendor_name)
     except Exception as e:

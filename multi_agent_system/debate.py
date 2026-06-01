@@ -11,12 +11,16 @@ from __future__ import annotations
 import json
 from typing import List, Optional
 
-from multi_agent_system.agents.base_agent import _client, _MODEL
+from multi_agent_system.agents.base_agent import _client, _MODEL, _SEED, _PROVIDER_PIN
 from multi_agent_system.orchestrator import (
     AGENT_REGISTRY,
     ALL_AGENTS,
     _extract_vendors,
     _pick_winner,
+    decision_key,
+    search_key,
+    cache_get,
+    cache_set,
 )
 from multi_agent_system.scoring import score_all_vendors, build_decision_matrix, compute_derived_confidence
 
@@ -54,6 +58,8 @@ def extract_vendor_names(text: str, max_vendors: int = 4) -> List[str]:
             response_format={"type": "json_object"},
             max_tokens=150,
             temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         data = json.loads(resp.choices[0].message.content)
         seen: list[str] = []
@@ -91,6 +97,8 @@ def detect_category(text: str) -> str:
             response_format={"type": "json_object"},
             max_tokens=40,
             temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         return str(json.loads(resp.choices[0].message.content).get("category", "")).strip()[:80]
     except Exception:
@@ -128,6 +136,8 @@ def classify_documents(documents: List[dict]) -> dict:
             response_format={"type": "json_object"},
             max_tokens=400,
             temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         data = json.loads(resp.choices[0].message.content)
         out: dict = {}
@@ -160,6 +170,14 @@ def search_vendors(
     """
     count = max(1, min(4, count))
     must = ", ".join(m for m in (must_include or []) if m.strip())
+
+    # Reproducible search: an identical query (a chat "reload") returns the SAME vendors
+    # from cache instead of a fresh non-deterministic live-web result, so the downstream
+    # decision stays stable. DISABLE_DECISION_CACHE=1 forces a genuinely fresh search.
+    _key = search_key(field, requirements, context_docs, count, must_include)
+    _hit = cache_get(_key)
+    if _hit is not None:
+        return _hit
 
     system = (
         "You are a procurement market researcher. You identify real, currently-available "
@@ -206,7 +224,9 @@ def search_vendors(
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=1300,
-                temperature=0.3,
+                temperature=0,
+                seed=_SEED,
+                extra_body=_PROVIDER_PIN,
             )
             data = json.loads(resp.choices[0].message.content)
             out: List[dict] = []
@@ -220,6 +240,8 @@ def search_vendors(
                 if len(out) >= count:
                     break
             if out:
+                out.sort(key=lambda v: v["name"].lower())   # canonical order → stable decision
+                cache_set(_key, out)
                 return out
         except Exception:
             continue
@@ -269,7 +291,9 @@ def draft_negotiation_email(
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=700,
-                temperature=0.4,
+                temperature=0,
+                seed=_SEED,
+                extra_body=_PROVIDER_PIN,
             )
             data = json.loads(resp.choices[0].message.content)
             raw_email = data.get("email")
@@ -356,7 +380,9 @@ def _synthesize(
             ],
             response_format={"type": "json_object"},
             max_tokens=600,
-            temperature=0.3,
+            temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         raw = json.loads(resp.choices[0].message.content)
         return _normalise_synth(raw, vendors)
@@ -445,6 +471,8 @@ def _prescreen_vendors(
             response_format={"type": "json_object"},
             max_tokens=400,
             temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         data = json.loads(resp.choices[0].message.content)
         out = {}
@@ -462,6 +490,26 @@ def _prescreen_vendors(
 
 
 def run_debate(
+    requirements: str,
+    vendor_info: str = "",
+    selected_agents: Optional[List[str]] = None,
+    vendors: Optional[List[str]] = None,
+    agent_configs: Optional[dict] = None,
+) -> dict:
+    """Cache shell around `_run_debate_impl` — identical input ⇒ identical result dict,
+    even across restarts. Bypass with DISABLE_DECISION_CACHE=1. The key covers
+    requirements + vendor_info + the board (selected_agents) + the explicit vendors +
+    the personalities (agent_configs), so changing any of them invalidates the cache."""
+    key = decision_key(requirements, vendor_info, selected_agents, vendors, agent_configs)
+    hit = cache_get(key)
+    if hit is not None:
+        return hit
+    result = _run_debate_impl(requirements, vendor_info, selected_agents, vendors, agent_configs)
+    cache_set(key, result)
+    return result
+
+
+def _run_debate_impl(
     requirements: str,
     vendor_info: str = "",
     selected_agents: Optional[List[str]] = None,

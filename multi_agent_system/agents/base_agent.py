@@ -25,6 +25,15 @@ def _client() -> OpenAI:
 
 _MODEL = os.getenv("AGENT_MODEL", "google/gemini-2.5-flash")
 
+# ── Determinism knobs (reproducible decisions) ──────────────────────────────────
+# Every chat.completions.create() call passes seed=_SEED and extra_body=_PROVIDER_PIN
+# (plus temperature=0) so the same input yields the same output run-to-run.
+_SEED = 42
+# Pin OpenRouter to a single provider so routing can't reintroduce variance. This
+# model routes to Google (API responses show provider="Google"). To HARD-pin one
+# provider, add an "order", e.g. {"order": ["Google AI Studio"], "allow_fallbacks": False}.
+_PROVIDER_PIN = {"provider": {"allow_fallbacks": False}}
+
 _RESPONSE_SCHEMA = """\
 Respond with a single JSON object — no markdown, no explanation outside it:
 {
@@ -173,7 +182,9 @@ class BaseAgent:
             ],
             response_format={"type": "json_object"},
             max_tokens=400,
-            temperature=0.3,
+            temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         raw = json.loads(resp.choices[0].message.content)
         return self._normalise(raw)
@@ -278,7 +289,9 @@ class BaseAgent:
             ],
             response_format={"type": "json_object"},
             max_tokens=320,
-            temperature=0.6,
+            temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         raw = json.loads(resp.choices[0].message.content)
         return self._normalise_turn(raw, phase)

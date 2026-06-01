@@ -644,7 +644,9 @@ def summarize(req: SummarizeRequest):
                 "parameters": {
                     "max_new_tokens": 24,
                     "return_full_text": False,
-                    "temperature": 0.2,
+                    # HuggingFace inference call (not OpenRouter) — temperature only;
+                    # seed/provider pinning are OpenRouter-specific and don't apply here.
+                    "temperature": 0,
                 },
             },
             timeout=30,
@@ -673,7 +675,7 @@ def requirement_summary(req: SummarizeRequest):
     purchasing requirements (budget, must-have features, constraints, scale).
     """
     import json as _json
-    from multi_agent_system.agents.base_agent import _client, _MODEL
+    from multi_agent_system.agents.base_agent import _client, _MODEL, _SEED, _PROVIDER_PIN
 
     text = (req.text or "").strip()
     if not text:
@@ -694,7 +696,9 @@ def requirement_summary(req: SummarizeRequest):
             ],
             response_format={"type": "json_object"},
             max_tokens=220,
-            temperature=0.2,
+            temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         data = _json.loads(resp.choices[0].message.content)
         summary = str(data.get("summary", "")).strip()[:60]
@@ -726,7 +730,7 @@ def requirements_assistant(body: AssistantBody):
     purchasing requirements in Step 1. Conversational, concise, asks clarifying
     questions and suggests requirement dimensions.
     """
-    from multi_agent_system.agents.base_agent import _client, _MODEL
+    from multi_agent_system.agents.base_agent import _client, _MODEL, _SEED, _PROVIDER_PIN
 
     system = (
         "You are a friendly, concise procurement requirements assistant inside an app where the "
@@ -748,7 +752,9 @@ def requirements_assistant(body: AssistantBody):
             model=_MODEL,
             messages=msgs,
             max_tokens=400,
-            temperature=0.5,
+            temperature=0,
+            seed=_SEED,
+            extra_body=_PROVIDER_PIN,
         )
         reply = (resp.choices[0].message.content or "").strip()
         return {"reply": reply or "Could you tell me a bit more about what you're looking to buy?"}

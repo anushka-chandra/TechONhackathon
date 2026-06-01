@@ -27,3 +27,6 @@ frontend/out/
 
 # Runtime data
 backend/data/sessions.json
+
+# Deterministic decision cache (Tier 3 reproducibility)
+.cache/

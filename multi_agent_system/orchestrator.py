@@ -5,7 +5,11 @@ collects their votes, and computes the overall recommendation.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import re
+from pathlib import Path
 from typing import List, Optional
 
 from multi_agent_system.agents.base_agent   import BaseAgent
@@ -28,6 +32,88 @@ AGENT_REGISTRY: dict[str, type[BaseAgent]] = {
 }
 
 ALL_AGENTS = ["ceo", "cfo", "cto", "cso", "procurement"]
+
+
+# ── Deterministic decision cache ────────────────────────────────────────────────
+# Memoizes the full result dict for a given (requirements + vendor_info) so identical
+# input provably returns byte-identical output, even across restarts (JSON on disk).
+# Bypass with DISABLE_DECISION_CACHE=1 to force a fresh run.
+_CACHE_DIR = Path(os.environ.get("DECISION_CACHE_DIR", ".cache"))
+
+
+def _cache_enabled() -> bool:
+    return os.environ.get("DISABLE_DECISION_CACHE", "") not in ("1", "true", "True", "yes")
+
+
+def decision_key(
+    requirements: str,
+    vendor_info: str,
+    selected_agents: Optional[List[str]] = None,
+    vendors: Optional[List[str]] = None,
+    agent_configs: Optional[dict] = None,
+) -> str:
+    """SHA-256 over ALL inputs that determine the result: the normalized
+    (whitespace-collapsed, lowercased) requirements + vendor_info, plus the board
+    (`selected_agents`, order-preserving), any explicit `vendors`, and the per-agent
+    `agent_configs` (personalities). Changing the board or personalities therefore
+    yields a different key, so a different setup can never return a stale decision."""
+    def _norm(s: str) -> str:
+        return " ".join((s or "").split()).strip().lower()
+    payload = {
+        "requirements":    _norm(requirements),
+        "vendor_info":     _norm(vendor_info),
+        "selected_agents": [str(a).lower() for a in (selected_agents or [])],   # order preserved
+        "vendors":         [str(v) for v in (vendors or [])],                   # order preserved
+        "agent_configs":   agent_configs or {},
+    }
+    blob = json.dumps(payload, sort_keys=True, default=str, ensure_ascii=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def search_key(
+    field: str,
+    requirements: str = "",
+    context_docs: str = "",
+    count: int = 3,
+    must_include: Optional[List[str]] = None,
+) -> str:
+    """SHA-256 over the vendor-search inputs, so re-running the SAME search (a chat
+    'reload') returns the SAME vendors instead of a fresh live-web result. Namespaced
+    with kind="vendor_search" so it never collides with a decision key."""
+    def _norm(s: str) -> str:
+        return " ".join((s or "").split()).strip().lower()
+    payload = {
+        "kind":         "vendor_search",
+        "field":        _norm(field),
+        "requirements": _norm(requirements),
+        "context_docs": _norm(context_docs),
+        "count":        int(count),
+        "must_include": sorted(_norm(m) for m in (must_include or [])),
+    }
+    blob = json.dumps(payload, sort_keys=True, default=str, ensure_ascii=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def cache_get(key: str):
+    """Return the cached result dict for `key`, or None on miss / cache disabled / error."""
+    if not _cache_enabled():
+        return None
+    p = _CACHE_DIR / f"{key}.json"
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    except Exception:
+        return None
+
+
+def cache_set(key: str, result: dict) -> None:
+    """Persist `result` under `key` as .cache/<hash>.json (best-effort, never raises)."""
+    if not _cache_enabled():
+        return
+    try:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        (_CACHE_DIR / f"{key}.json").write_text(json.dumps(result), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def _extract_vendors(requirements: str) -> List[str]:
@@ -77,6 +163,22 @@ def _pick_winner(
 
 
 def run_society(
+    requirements: str,
+    vendor_info: str = "",
+    selected_agents: Optional[List[str]] = None,
+    vendors: Optional[List[str]] = None,
+) -> dict:
+    """Cache shell around `_run_society_impl` — identical input (incl. board) ⇒ identical output."""
+    key = decision_key(requirements, vendor_info, selected_agents, vendors)
+    hit = cache_get(key)
+    if hit is not None:
+        return hit
+    result = _run_society_impl(requirements, vendor_info, selected_agents, vendors)
+    cache_set(key, result)
+    return result
+
+
+def _run_society_impl(
     requirements: str,
     vendor_info: str = "",
     selected_agents: Optional[List[str]] = None,
