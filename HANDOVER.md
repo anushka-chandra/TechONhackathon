@@ -295,12 +295,14 @@ When you make new changes, update this section (and the rest of this file) accor
 - **Profile/sign-in** is localStorage only — no real auth backend.
 - **Negotiation email lookup** may hallucinate plausible addresses — UI tells the user to verify.
 - `:online` web search adds a small per-search $ surcharge (drove the $ spend up vs token count).
-- OpenRouter: the key has a **$100 spend cap** (`/auth/key` shows usage ~$1.01, "remaining" ~$98.99)
-  BUT the **account's actual credit wallet is depleted** — live API calls now return
-  **`402 Insufficient credits`**. So as of this handover, ALL AI features silently fall back to
-  empties/garbage (e.g. decision matrix shows placeholder vendors). This is NOT a code bug — the user
-  must top up credits at https://openrouter.ai/settings/credits. The "remaining $98.99" is the key
-  cap, not the wallet. Key expires **2026-06-05**.
+- OpenRouter: **the wallet has been topped up — live API calls work again** (verified 2026-06-01: a
+  real `chat/completions` call returned HTTP 200 and billed ~$0.0000028; the earlier
+  `402 Insufficient credits` failure is RESOLVED). AI features (debate/scoring/search) are live, not
+  falling back to empties. Caveats on visibility: the key (`/auth/key`) has a **$100 spend cap** with
+  **~$97.97 remaining** (key usage ~$2.03) — but that's the KEY CAP, not the wallet balance. The real
+  wallet $ balance can't be read with this key (`/credits` → 403 "only management keys"); check
+  https://openrouter.ai/settings/credits in the browser for the actual number. Key **expires
+  2026-06-05**.
 
 ---
 
