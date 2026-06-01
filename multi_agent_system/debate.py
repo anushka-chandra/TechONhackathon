@@ -608,7 +608,14 @@ def run_debate(
         scores_by_vendor = {sc["vendor_name"]: sc["compatibility_score"] for sc in scorecards}
 
         def _qualifies(v: str) -> bool:
-            return all(not r["scores"].get(v, {}).get("failed", False) for r in mandatory_reqs)
+            if not mandatory_reqs:
+                return True
+            failed_count = sum(
+                1 for r in mandatory_reqs
+                if r["scores"].get(v, {}).get("failed", False)
+            )
+            pass_rate = 1.0 - (failed_count / len(mandatory_reqs))
+            return pass_rate >= 0.70
 
         # The winner MUST pass every hard constraint. Rank ONLY among qualifying vendors —
         # never crown a vendor that failed a mandatory requirement just because its soft

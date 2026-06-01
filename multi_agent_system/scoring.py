@@ -264,6 +264,8 @@ def build_decision_matrix(scorecards: List[dict]) -> dict:
             if not crit:
                 continue
             lc = crit.lower()
+            import re
+            lc = re.sub(r'[^a-z0-9]', '', lc)
             if lc not in canon:
                 canon[lc] = {"name": crit, "mandatory": False, "raw": {}}
                 order.append(lc)
