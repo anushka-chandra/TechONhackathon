@@ -311,12 +311,19 @@ def build_decision_matrix(scorecards: List[dict]) -> dict:
             "justification": justification[:240],
         })
 
-    # Hard constraints gate the ranking: a vendor that fails any mandatory requirement
-    # can NEVER outrank one that passes them all, regardless of its soft score. Sort by
-    # (passes_all_hard, total) so the top of the matrix is always a qualifying vendor —
-    # keeping the matrix ranking/trophy consistent with the banner winner.
+    # Hard constraints gate the ranking: a vendor passing ≥70% of mandatory requirements
+    # outranks one below that threshold regardless of soft score. Sort by (passes_hard,
+    # total) so the top of the matrix is always a qualifying vendor — keeping the matrix
+    # ranking/trophy consistent with the banner winner (same 70% rule as debate.py
+    # `_qualifies`).
     def _passes_hard(v: str) -> bool:
-        return not any(r["scores"][v]["failed"] for r in requirements if r["mandatory"])
+        if not requirements:
+            return True
+        mandatory = [r for r in requirements if r["mandatory"]]
+        if not mandatory:
+            return True
+        failed = sum(1 for r in mandatory if r["scores"].get(v, {}).get("failed", False))
+        return (1.0 - failed / len(mandatory)) >= 0.70
 
     ranking = sorted(
         ({"vendor": v, "total": round(totals[v], 3)} for v in vendors),

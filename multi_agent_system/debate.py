@@ -602,8 +602,9 @@ def run_debate(
         vote_total = sum(1 for r in rounds for t in r.get("turns", []) if t.get("vote") in ("YES", "NO"))
         confidence = compute_derived_confidence(scorecards, vote_yes, vote_total)
 
-        # A vendor "qualifies" iff it fails NO mandatory requirement in the normalized
-        # matrix (identical to the frontend DecisionMatrix "no viable vendor" detection).
+        # A vendor qualifies if it passes ≥70% of hard constraints. Only vendors that meet
+        # this threshold enter the winner selection. If none reach 70%, there is no valid
+        # recommendation. (Same formula as build_decision_matrix's `_passes_hard`.)
         mandatory_reqs = [r for r in decision_matrix.get("requirements", []) if r.get("mandatory")]
         scores_by_vendor = {sc["vendor_name"]: sc["compatibility_score"] for sc in scorecards}
 
@@ -617,9 +618,9 @@ def run_debate(
             pass_rate = 1.0 - (failed_count / len(mandatory_reqs))
             return pass_rate >= 0.70
 
-        # The winner MUST pass every hard constraint. Rank ONLY among qualifying vendors —
-        # never crown a vendor that failed a mandatory requirement just because its soft
-        # score is high. If none qualify, there is no valid recommendation (NONE).
+        # Rank ONLY among qualifying vendors (≥70% hard-constraint pass) — never crown a
+        # vendor below that threshold just because its soft score is high. If none qualify,
+        # there is no valid recommendation (NONE).
         qualifying = sorted(
             (v for v in vendor_list if _qualifies(v)),
             key=lambda v: scores_by_vendor.get(v, 0), reverse=True,

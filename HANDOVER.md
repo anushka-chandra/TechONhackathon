@@ -180,14 +180,17 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   counts against the others — missing ⇒ 0, missing-mandatory ⇒ fail), hard rows binary 1.0/0.0 at the
   0.5 threshold, soft rows proportional 0–1, weights hard=2/soft=1, normalised. `run_debate`
   (`debate.py`) then **derives everything from that one matrix**: each scorecard's `compatibility_score
-  = round(totals[v]*100)`, and the **winner/runner_up are ranked ONLY among QUALIFYING vendors** —
-  those that fail no mandatory matrix row. A vendor that fails a hard constraint can NEVER be crowned,
-  even if its soft score gives it a higher total than a qualifying vendor (this fixed a bug where the
-  banner showed a feasible winner while the matrix showed that vendor's hard constraint FAILED). If no
-  vendor qualifies → `winner="NONE"`, `all_constraints_failed=True`. To keep the matrix's own
-  ranking/trophy/explanation consistent with this, `build_decision_matrix`'s `ranking` now sorts by
-  **(passes_all_hard, total)** so a hard-failed vendor can never be `ranking[0]` (the frontend trophies
-  `ranking[0]` and highlights `winner`, so both now point at the same qualifying vendor). So the banner
+  = round(totals[v]*100)`, and the **winner/runner_up are ranked ONLY among QUALIFYING vendors** — a
+  vendor qualifies if it passes **≥70% of mandatory (hard) requirements** (`debate.py._qualifies`:
+  `1 - failed/total ≥ 0.70`). A vendor below 70% can NEVER be crowned, even if its soft score gives it
+  a higher total than a qualifying vendor (this fixed a bug where the banner showed a feasible winner
+  while the matrix showed that vendor's hard constraint FAILED). If NO vendor reaches 70% →
+  `winner="NONE"`, `all_constraints_failed=True`. To keep the matrix's own ranking/trophy/explanation
+  consistent with this, `build_decision_matrix`'s `ranking` sorts by **(passes_hard, total)** where
+  `_passes_hard` uses the **identical 70% formula** as `_qualifies` — so a sub-70% vendor can never be
+  `ranking[0]` (the frontend trophies `ranking[0]` and highlights `winner`, so both point at the same
+  qualifying vendor). **`_qualifies` (winner) and `_passes_hard` (matrix ranking) are now the same
+  ≥70% rule — change them together.** So the banner
   winner, the matrix totals, and the per-vendor scorecard number are the exact same numbers and can
   never contradict. (`_compute_score` is still the same per-row formula but
   over a vendor's OWN rows; in the debate path its value is immediately overwritten by the union total.
@@ -197,9 +200,13 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   the persona sliders stay live/meaningful but can never lift an all-hard-failed (0) vendor above 20.
   `DecisionMatrix` (and the debate-page banner) detect the "no viable vendor" case (winner="NONE", or
   no vendor passes all mandatory rows) and show a red notice instead of crowning a least-bad vendor.
-  CAVEAT: union-merge keys off the exact lowercased criterion name, so if the LLM names the same hard
-  constraint differently per vendor ("Budget ≤ 400" vs "Budget cap") they won't merge and each vendor
-  can fail the other's row — a pre-existing matrix concern, now also reflected in the winner signal.
+  Duplicate-row merge: the union-merge key is the lowercased criterion name with **all
+  non-alphanumerics stripped** (`re.sub(r'[^a-z0-9]','',lc)`), so punctuation/spacing/case/operator
+  variants collapse to one row ("Budget <= 400" / "budget<=400" → `budget400`; "EU-hosted" /
+  "EU hosted" → `euhosted`). CAVEAT: this is a **partial** fix — variants with *different words* still
+  don't merge ("Team size (30 people)" → `teamsize30people` vs "team_size_30" → `teamsize30`), so each
+  becomes its own row and each vendor can fail the other's row. True semantic merge needs fuzzy/LLM
+  matching (not done).
   Scoring rigor: `SCORING_SYSTEM_PROMPT` starts with an **Evidence-First rule** (rule 0 — no
   evidence in `<vendor_data>` ⇒ soft score 0.0 / mandatory `hard_constraints_passed=false`; never
   infer features) and ends with a **Scope rule (rule 5)** — only evaluate requirements explicitly in
@@ -296,11 +303,13 @@ Everything is committed/pushed to `main`. Most recent work (this session):
    use one weighted formula (see §6); a vendor failing every hard constraint scores 0, and the three
    numbers agree. What-If persona sliders are live again as a capped +0–20 bonus on top of the matrix
    base. Verified deterministically in Python (score == matrix total ×100) and `npx tsc --noEmit` clean.
-3. **Winner gated by hard constraints** — winner/runner_up are ranked ONLY among qualifying vendors
-   (no failed mandatory row); a hard-failed vendor is never crowned even with a higher soft total, and
-   `build_decision_matrix.ranking` sorts by `(passes_all_hard, total)` so the matrix trophy/explanation
-   agrees with the banner (see §6). Fixed the bug where the banner showed a feasible winner while the
-   matrix showed that vendor's hard constraint FAILED.
+3. **Winner gated by hard constraints (≥70%)** — winner/runner_up are ranked ONLY among qualifying
+   vendors (pass ≥70% of mandatory rows); a sub-70% vendor is never crowned even with a higher soft
+   total, and `build_decision_matrix.ranking` sorts by `(passes_hard, total)` using the SAME 70%
+   formula (`_qualifies` == `_passes_hard`) so the matrix trophy/explanation agrees with the banner
+   (see §6). Fixed the bug where the banner showed a feasible winner while the matrix showed that
+   vendor's hard constraint FAILED. Also: duplicate matrix rows merged via alphanumeric-stripped keys
+   (partial — different-word variants can still duplicate).
 4. **Scoring robustness** — `score_vendor` `max_tokens` 1100→2500 (avoid truncated-JSON fallback),
    logs `[score_vendor] fallback for <vendor>: <err>` to stderr, and `_fallback_card` now reports
    `hard_constraints_passed=False`. Plus a scope rule (`SCORING_SYSTEM_PROMPT` rule 5) — score only
