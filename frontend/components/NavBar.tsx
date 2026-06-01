@@ -58,8 +58,9 @@ export default function NavBar() {
           borderBottom: '1px solid rgba(124,58,237,.10)',
         }}
       >
-        {/* Brand */}
-        <button onClick={() => router.push('/')} className="flex items-center gap-2 mr-3">
+        {/* Brand — full navigation to the landing hero (router.push('/') wouldn't reset the
+            wizard's hasStartedAnalysis state when already on '/'; same pattern as New Chat). */}
+        <button onClick={() => { window.location.href = '/' }} className="flex items-center gap-2 mr-3">
           <span className="w-7 h-7 rounded-lg flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff"
