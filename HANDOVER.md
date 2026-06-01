@@ -181,7 +181,10 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   can fail the other's row — a pre-existing matrix concern, now also reflected in the winner signal.
   Scoring rigor: `SCORING_SYSTEM_PROMPT` starts with an **Evidence-First rule** (rule 0 — no
   evidence in `<vendor_data>` ⇒ soft score 0.0 / mandatory `hard_constraints_passed=false`; never
-  infer features); `score_vendor` runs at **temperature=0** (deterministic), feeds up to **10k**
+  infer features) and ends with a **Scope rule (rule 5)** — only evaluate requirements explicitly in
+  `<user_requirements>`; do NOT invent criteria from vendor-doc features (SSO, certs, etc.) that the
+  user didn't ask for (also curbs union-matrix criterion bloat). `score_vendor` runs at
+  **temperature=0** (deterministic), feeds up to **10k**
   chars each of vendor_data and the transcript, and requests **`max_tokens=2500`** (bumped from 1100
   so larger requirement matrices aren't truncated into invalid JSON → fallback). On any exception it
   logs `[score_vendor] fallback for <vendor>: <err>` to **stderr** then returns `_fallback_card`,

@@ -41,6 +41,9 @@ Never infer, assume, or guess that a feature exists unless it is explicitly stat
    CSO: compliance/data protection/access controls).
 4. CONFIDENCE & JUSTIFICATION: every score MUST include a 1-sentence evidence string citing the
    specific data point or agent argument used. No scores without evidence.
+5. SCOPE RULE: Only evaluate requirements explicitly stated in <user_requirements>. Do NOT invent
+   additional criteria based on features mentioned in vendor documents. If a vendor offers SSO,
+   certifications, or other features not requested, ignore them entirely.
 
 OUTPUT FORMAT — respond ONLY with a valid JSON object matching this schema, no prose, no markdown:
 {
