@@ -145,10 +145,13 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   `all_constraints_failed=True`, `decision.pre_screened=True`, `powered_by="pre_screen"`, empty
   rounds/scorecards (the frontend's red "No Vendor Qualifies" banner already covers this).
   • **MIDDLE** — keep only vendors with `rate ≥ 0.70` (if none hit 0.70, relax to the single best rate)
-  and debate just those. • **SINGLE eligible vendor** (after filtering) → no debate (one-sided is
-  meaningless): return it as `winner`, `confidence = round(rate*100)`, `powered_by="pre_screen"`. •
-  **BEST** — exactly one vendor passes ALL hard constraints (rate 1.0) → `decision.pre_selected_winner
-  = that vendor` (the rest of the debate still runs to justify it). Every non-WORST return now carries
+  and debate just those. • **SINGLE *perfect* vendor** — the short-circuit fires ONLY when the lone
+  eligible vendor passed ALL hard constraints (`rate == 1.0`): no debate (one-sided + already perfect),
+  return it as `winner`, `confidence = round(rate*100) = 100`, `powered_by="pre_screen"`. A single
+  *imperfect* eligible vendor (e.g. 0.7) does NOT short-circuit — it gets a normal debate to scrutinize
+  its unmet hard constraints. So the 0.70 threshold only controls who ENTERS the debate, never who is
+  auto-crowned. • **BEST** — exactly one vendor passes ALL hard constraints (rate 1.0) →
+  `decision.pre_selected_winner = that vendor` (the rest of the debate still runs to justify it). Every non-WORST return now carries
   `decision.pre_selected_winner` (str|null) and `decision.pre_screen_results` ({vendor: rate}); the
   frontend shows a blue/purple "clear winner detected before debate" banner above the green winner
   banner when `pre_selected_winner` is set (its second sentence adapts to whether a debate actually

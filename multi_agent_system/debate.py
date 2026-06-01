@@ -529,9 +529,11 @@ def run_debate(
     # Store pre-screen results to include in the response
     pre_screen_results = prescreens
 
-    # SINGLE ELIGIBLE VENDOR: a one-sided debate is meaningless — return it directly as
-    # the winner, with confidence derived from its pre-screen hard-constraint pass rate.
-    if len(vendor_list) == 1:
+    # SINGLE PERFECT VENDOR: skip the debate ONLY when the lone eligible vendor passed
+    # ALL hard constraints (rate 1.0) — a one-sided debate adds nothing there. The 0.70
+    # threshold only controls who ENTERS the debate; a single IMPERFECT vendor (e.g. 0.7)
+    # still gets a normal debate to scrutinize its unmet hard constraints.
+    if len(vendor_list) == 1 and prescreens.get(vendor_list[0], 1.0) == 1.0:
         sole = vendor_list[0]
         sole_rate = prescreens.get(sole, 1.0)
         return {
