@@ -249,7 +249,7 @@ def _bucket_criterion(raw: str) -> str:
     import re
     s = re.sub(r'[^a-z0-9]', '', raw.lower())
     # Budget — any mention of budget/cost/price/spend
-    if any(k in s for k in ('budget', 'cost', 'price', 'spend', 'month', 'subscription')):
+    if any(k in s for k in ('budget', 'cost', 'price', 'spend')):
         return 'budget'
     # Team size — any mention of team/user/people/seats/capacity
     if any(k in s for k in ('team', 'user', 'people', 'seat', 'capacity', 'member')):
@@ -261,13 +261,13 @@ def _bucket_criterion(raw: str) -> str:
     if any(k in s for k in ('file', 'sharing', 'attachment', 'document', 'storage')):
         return 'filesharing'
     # Slack integration
-    if any(k in s for k in ('slack', 'integration', 'integrate', 'connect')):
+    if any(k in s for k in ('slack',)):
         return 'slackintegration'
     # EU hosting
     if any(k in s for k in ('eu', 'europe', 'host', 'datacenter', 'gdpr', 'residency')):
         return 'euhosting'
     # Mobile app
-    if any(k in s for k in ('mobile', 'app', 'ios', 'android')):
+    if any(k in s for k in ('mobile', 'ios', 'android')):
         return 'mobileapp'
     # SSO / auth
     if any(k in s for k in ('sso', 'auth', 'saml', 'oauth', 'signin', 'login')):
@@ -302,7 +302,6 @@ def build_decision_matrix(scorecards: List[dict]) -> dict:
             crit = str(m.get("criterion", "")).strip()
             if not crit:
                 continue
-            lc = crit.lower()
             lc = _bucket_criterion(crit)
             if lc not in canon:
                 canon[lc] = {"name": crit, "mandatory": False, "raw": {}}
