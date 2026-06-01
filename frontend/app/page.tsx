@@ -68,10 +68,10 @@ const AGENT_META: Record<AgentId, { label: string; sub: string; color: string; i
 }
 
 const colorMap: Record<string, { bg: string; text: string }> = {
-  blue:    { bg: 'rgba(59,130,246,.2)',  text: '#60a5fa' },
+  blue:    { bg: 'rgba(59,130,246,.2)',  text: '#a78bfa' },
   emerald: { bg: 'rgba(16,185,129,.2)',  text: '#34d399' },
-  amber:   { bg: 'rgba(245,158,11,.2)',  text: '#fbbf24' },
-  rose:    { bg: 'rgba(244,63,94,.2)',   text: '#fb7185' },
+  amber:   { bg: 'rgba(245,158,11,.2)',  text: '#facc15' },
+  rose:    { bg: 'rgba(244,63,94,.2)',   text: '#f43f5e' },
 }
 
 // ── Per-agent personality customization (Step 2) ──────────────────────
@@ -112,8 +112,8 @@ function Seg<T extends string>({ options, value, onChange }: {
           <button key={o.v} type="button" onClick={() => onChange(o.v)}
             className="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors"
             style={{
-              background: active ? '#4f46e5' : 'rgba(255,255,255,.06)',
-              color: active ? '#fff' : '#9ca3af', border: '1px solid rgba(255,255,255,.12)',
+              background: active ? '#7c3aed' : 'rgba(124,58,237,.06)',
+              color: active ? '#fff' : '#9a8cae', border: '1px solid rgba(124,58,237,.14)',
             }}>
             {o.label}
           </button>
@@ -519,7 +519,7 @@ export default function LandingPage() {
     const outerNodes = ring(14, 42, 0.22)
 
     content = (
-      <div className="relative w-full min-h-[calc(100vh-3.5rem)] overflow-hidden fade-in-up" style={{ background: '#050505' }}>
+      <div className="relative w-full min-h-[calc(100vh-3.5rem)] overflow-hidden fade-in-up" style={{ background: '#ffffff' }}>
         <div className="bg-mesh" />
 
         {/* Two-column hero: copy left, Clarity Decision Core right (y-centered) */}
@@ -528,20 +528,20 @@ export default function LandingPage() {
           {/* Left — copy, CTA, metrics */}
           <div className="flex-1 w-full">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm mb-6"
-              style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', color: '#9ca3af' }}>
-              <span className="w-2 h-2 rounded-full" style={{ background: '#6366f1' }} />
+              style={{ background: 'rgba(124,58,237,.05)', border: '1px solid rgba(124,58,237,.14)', color: '#9a8cae' }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: '#8b5cf6' }} />
               AI Purchasing Society
             </div>
 
             <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05] mb-6"
-              style={{ color: '#ffffff' }}>
+              style={{ color: '#160f24' }}>
               Turn vendor noise into a<br />
-              <span style={{ background: 'linear-gradient(to right, #818cf8, #38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              <span style={{ background: 'linear-gradient(to right, #8b5cf6, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 defensible decision.
               </span>
             </h1>
 
-            <p className="text-lg font-light max-w-xl mb-9" style={{ color: '#9ca3af' }}>
+            <p className="text-lg font-light max-w-xl mb-9" style={{ color: '#574f63' }}>
               A virtual boardroom of specialized AI agents debates your shortlist across budget,
               security, compliance and more — then hands you an auditable, scored recommendation
               you can stand behind.
@@ -550,7 +550,7 @@ export default function LandingPage() {
             <button
               onClick={startTransition}
               className="group inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full text-sm font-semibold transition-transform hover:scale-[1.03]"
-              style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: '#fff', boxShadow: '0 0 28px rgba(99,102,241,.45)' }}
+              style={{ background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', boxShadow: '0 8px 22px rgba(124,58,237,.28)' }}
             >
               Start Analysis
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -573,11 +573,11 @@ export default function LandingPage() {
               {/* Rotating neural network (empty nodes + connectors) */}
               <div className="absolute inset-0" style={{ animation: 'orbit-spin 60s linear infinite' }}>
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100"
-                  style={{ filter: 'drop-shadow(0 0 1.5px rgba(129,140,248,.7))' }} aria-hidden>
+                  style={{ filter: 'drop-shadow(0 0 1.5px rgba(168,85,247,.45))' }} aria-hidden>
                   {/* core → inner connectors */}
                   {innerNodes.map((n, i) => (
                     <line key={`ci${i}`} x1="50" y1="50" x2={n.x} y2={n.y}
-                      stroke="rgba(129,140,248,.22)" strokeWidth="0.28" />
+                      stroke="rgba(155,108,245,.20)" strokeWidth="0.28" />
                   ))}
                   {/* inner → outer mesh */}
                   {innerNodes.map((n, i) => {
@@ -585,8 +585,8 @@ export default function LandingPage() {
                     const o2 = outerNodes[(i + 1) % outerNodes.length]
                     return (
                       <g key={`io${i}`}>
-                        <line x1={n.x} y1={n.y} x2={o.x} y2={o.y} stroke="rgba(56,189,248,.16)" strokeWidth="0.22" />
-                        <line x1={n.x} y1={n.y} x2={o2.x} y2={o2.y} stroke="rgba(56,189,248,.12)" strokeWidth="0.18" />
+                        <line x1={n.x} y1={n.y} x2={o.x} y2={o.y} stroke="rgba(147,51,234,.16)" strokeWidth="0.22" />
+                        <line x1={n.x} y1={n.y} x2={o2.x} y2={o2.y} stroke="rgba(147,51,234,.12)" strokeWidth="0.18" />
                       </g>
                     )
                   })}
@@ -594,35 +594,25 @@ export default function LandingPage() {
                   {outerNodes.map((n, i) => {
                     const next = outerNodes[(i + 1) % outerNodes.length]
                     return <line key={`oo${i}`} x1={n.x} y1={n.y} x2={next.x} y2={next.y}
-                      stroke="rgba(129,140,248,.1)" strokeWidth="0.15" />
+                      stroke="rgba(168,85,247,.10)" strokeWidth="0.15" />
                   })}
                   {/* nodes (empty dots) */}
                   {outerNodes.map((n, i) => (
-                    <circle key={`on${i}`} cx={n.x} cy={n.y} r="0.7" fill="#7dd3fc"
+                    <circle key={`on${i}`} cx={n.x} cy={n.y} r="0.7" fill={i % 5 === 0 ? '#f5c518' : '#cdb4f7'}
                       style={{ animation: `node-twinkle ${3 + (i % 4)}s ease-in-out ${i * 0.2}s infinite` }} />
                   ))}
                   {innerNodes.map((n, i) => (
-                    <circle key={`in${i}`} cx={n.x} cy={n.y} r="1" fill="#a5b4fc"
+                    <circle key={`in${i}`} cx={n.x} cy={n.y} r="1" fill="#cdb4f7"
                       style={{ animation: `node-twinkle ${2.5 + (i % 3)}s ease-in-out ${i * 0.3}s infinite` }} />
                   ))}
                 </svg>
               </div>
 
-              {/* Pulsing rings behind the core */}
-              <div className="absolute rounded-full" style={{
-                top: '50%', left: '50%', width: 300, height: 300, transform: 'translate(-50%,-50%)',
-                border: '1px solid rgba(99,102,241,.45)', animation: 'pulse-ring 3.6s ease-out infinite',
-              }} />
-              <div className="absolute rounded-full" style={{
-                top: '50%', left: '50%', width: 300, height: 300, transform: 'translate(-50%,-50%)',
-                border: '1px solid rgba(56,189,248,.4)', animation: 'pulse-ring 3.6s ease-out 1.8s infinite',
-              }} />
-
               {/* Central Clarity orb */}
               <div className="absolute rounded-full"
                 style={{
                   top: '50%', left: '50%', width: 250, height: 250, transform: 'translate(-50%,-50%)',
-                  background: 'radial-gradient(circle at 32% 26%, #c7d2fe 0%, #818cf8 30%, #4f46e5 62%, #312e81 100%)',
+                  background: 'radial-gradient(circle at 34% 28%, #f3ebff 0%, #dcc6f7 32%, #b48cf0 66%, #9b6cf5 100%)',
                   animation: fadingOut
                     ? 'breathe 0.9s ease-in-out infinite, core-glow 0.9s ease-in-out infinite'
                     : 'breathe 4.5s ease-in-out infinite, core-glow 3.2s ease-in-out infinite',
@@ -639,7 +629,7 @@ export default function LandingPage() {
                 }} />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-4xl font-black text-white tracking-tight"
-                    style={{ textShadow: '0 1px 12px rgba(0,0,0,.5)' }}>
+                    style={{ textShadow: '0 1px 10px rgba(70,40,120,.45)' }}>
                     Clarity
                   </span>
                 </div>
@@ -652,7 +642,7 @@ export default function LandingPage() {
   } else if (phase === 'intro' || phase === 'expanding') {
     content = (
       <div className="relative w-full h-screen flex items-center justify-center overflow-hidden"
-        style={{ background: '#050505' }}>
+        style={{ background: '#ffffff' }}>
         <div className="bg-mesh" />
 
         {/* Orb */}
@@ -681,7 +671,7 @@ export default function LandingPage() {
   } else {
     content = (
     <div className="relative w-full h-full min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center overflow-hidden fade-in-up"
-      style={{ background: '#050505' }}>
+      style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfaff 55%, #f7f1fd 100%)' }}>
       <div className="bg-mesh" />
 
       {/* Steps */}
@@ -689,49 +679,36 @@ export default function LandingPage() {
 
         {/* Step 1 */}
         <div className={stepClass(1)} style={{ padding: '0 1rem' }}>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm mb-6"
-            style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', color: '#9ca3af' }}>
-            <span className="w-2 h-2 rounded-full" style={{ background: '#6366f1' }} />
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium mb-8"
+            style={{ background: 'rgba(124,58,237,.07)', border: '1px solid rgba(124,58,237,.18)', color: '#7c3aed' }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#8b5cf6' }} />
             Step 1 of 3
           </div>
-          <h1 className="text-5xl font-semibold tracking-tight text-white mb-4">
+          <h1 className="text-5xl font-semibold tracking-tight text-[#160f24] mb-6">
             Define your requirements.
           </h1>
-          <p className="text-lg font-light max-w-2xl mx-auto" style={{ color: '#9ca3af' }}>
+          <p className="text-lg font-light max-w-2xl mx-auto leading-relaxed" style={{ color: '#574f63' }}>
             What are you looking to purchase? Describe your budget limits, mandatory features, and what matters most when comparing offers.
           </p>
         </div>
 
         {/* Step 2 */}
         <div className={stepClass(2)} style={{ padding: '0 1rem' }}>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm mb-6"
-            style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', color: '#9ca3af' }}>
-            <span className="w-2 h-2 rounded-full" style={{ background: '#10b981' }} />
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium mb-8"
+            style={{ background: 'rgba(124,58,237,.07)', border: '1px solid rgba(124,58,237,.18)', color: '#7c3aed' }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10b981' }} />
             Step 2 of 3
           </div>
-          <h1 className="text-5xl font-semibold tracking-tight text-white mb-4">
+          <h1 className="text-5xl font-semibold tracking-tight text-[#160f24] mb-6">
             Select your AI Board.
           </h1>
-          <p className="text-lg font-light max-w-2xl mx-auto" style={{ color: '#9ca3af' }}>
+          <p className="text-lg font-light max-w-2xl mx-auto leading-relaxed" style={{ color: '#574f63' }}>
             Choose which executive perspectives should evaluate the proposals.
           </p>
           <button
             onClick={() => setIsPanelOpen(true)}
-            className="mt-8 inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200"
-            style={{
-              background: 'rgba(255,255,255,.06)',
-              border: '1px solid rgba(255,255,255,.12)',
-              color: '#e5e7eb',
-              backdropFilter: 'blur(8px)',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.1)'
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,.25)'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.06)'
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,.12)'
-            }}
+            className="mt-10 group inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full text-sm font-semibold transition-all hover:scale-[1.03] hover:brightness-110"
+            style={{ background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', boxShadow: '0 8px 22px rgba(124,58,237,.28)' }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -747,20 +724,20 @@ export default function LandingPage() {
         {/* Step 3 */}
         <div className={stepClass(3)}
           style={{ padding: '0 1rem', maxWidth: '80rem' }}>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm mb-6"
-            style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', color: '#9ca3af' }}>
-            <span className="w-2 h-2 rounded-full" style={{ background: '#38bdf8' }} />
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium mb-8"
+            style={{ background: 'rgba(124,58,237,.07)', border: '1px solid rgba(124,58,237,.18)', color: '#7c3aed' }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#b07cf0' }} />
             Step 3 of 3
           </div>
-          <h1 className="text-5xl font-semibold tracking-tight text-white mb-4">
+          <h1 className="text-5xl font-semibold tracking-tight text-[#160f24] mb-6">
             Provide vendor information.
           </h1>
-          <p className="text-lg font-light mb-12" style={{ color: '#9ca3af' }}>
+          <p className="text-lg font-light mb-14 leading-relaxed" style={{ color: '#574f63' }}>
             Upload vendor files for any product or service, and/or let our AI agent search the web —
             combine both if you like. Up to {MAX_VENDORS} sources in total.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-7 max-w-5xl mx-auto">
             {/* Hidden native file picker driven by the Upload card */}
             <input
               ref={fileInputRef}
@@ -774,12 +751,12 @@ export default function LandingPage() {
             {/* Upload */}
             <button
               className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ border: '1px solid rgba(107,114,128,.5)' }}
+              style={{ border: '1px solid rgba(124,58,237,.16)', boxShadow: '0 2px 12px rgba(46,31,71,.06)' }}
               onClick={() => fileInputRef.current?.click()}
               disabled={actionLoading !== null || documents.length >= MAX_VENDORS}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(99,102,241,.1)', color: '#818cf8' }}>
+                style={{ background: 'rgba(168,85,247,.1)', color: '#b794f6' }}>
                 {actionLoading === 'upload' ? <SpinnerIcon /> : (
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -790,22 +767,22 @@ export default function LandingPage() {
                 )}
               </div>
               <div>
-                <h3 className="text-xl font-medium text-white mb-2">
+                <h3 className="text-xl font-medium text-[#2b1d3f] mb-2">
                   {actionLoading === 'upload' ? 'Initializing...' : 'Upload Files'}
                 </h3>
-                <p className="text-sm" style={{ color: '#9ca3af' }}>Select one or more PDFs, spreadsheets, or text files.</p>
+                <p className="text-sm" style={{ color: '#9a8cae' }}>Select one or more PDFs, spreadsheets, or text files.</p>
               </div>
             </button>
 
             {/* AI Search */}
             <button
               className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ border: '1px solid rgba(107,114,128,.5)' }}
+              style={{ border: '1px solid rgba(124,58,237,.16)', boxShadow: '0 2px 12px rgba(46,31,71,.06)' }}
               onClick={openSearchModal}
               disabled={actionLoading !== null || documents.length >= MAX_VENDORS}
             >
               <div className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(56,189,248,.1)', color: '#38bdf8' }}>
+                style={{ background: 'rgba(147,51,234,.1)', color: '#b07cf0' }}>
                 {actionLoading === 'search' ? <SpinnerIcon /> : (
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -816,17 +793,17 @@ export default function LandingPage() {
                 )}
               </div>
               <div>
-                <h3 className="text-xl font-medium text-white mb-2">
+                <h3 className="text-xl font-medium text-[#2b1d3f] mb-2">
                   {actionLoading === 'search' ? 'Initializing...' : 'AI Web Search'}
                 </h3>
-                <p className="text-sm" style={{ color: '#9ca3af' }}>Let agents automatically find vendors online.</p>
+                <p className="text-sm" style={{ color: '#9a8cae' }}>Let agents automatically find vendors online.</p>
               </div>
             </button>
 
             {/* Type Details (manual entry) */}
             <button
               className="action-card glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ border: '1px solid rgba(107,114,128,.5)' }}
+              style={{ border: '1px solid rgba(124,58,237,.16)', boxShadow: '0 2px 12px rgba(46,31,71,.06)' }}
               onClick={openTypeModal}
               disabled={actionLoading !== null || documents.length >= MAX_VENDORS}
             >
@@ -839,58 +816,59 @@ export default function LandingPage() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-xl font-medium text-white mb-2">Type Details</h3>
-                <p className="text-sm" style={{ color: '#9ca3af' }}>Manually enter vendor info if you have no documents.</p>
+                <h3 className="text-xl font-medium text-[#2b1d3f] mb-2">Type Details</h3>
+                <p className="text-sm" style={{ color: '#9a8cae' }}>Manually enter vendor info if you have no documents.</p>
               </div>
             </button>
           </div>
 
           {/* Gathered sources (files + AI vendors) + continue */}
-          <div className="max-w-3xl mx-auto mt-8">
+          <div className="max-w-3xl mx-auto mt-12">
             {documents.length > 0 && (
-              <div className="rounded-2xl p-4 mb-5 text-left"
-                style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)' }}>
+              <div className="rounded-2xl p-5 mb-6 text-left"
+                style={{ background: '#faf8fe', border: '1px solid rgba(124,58,237,.14)', boxShadow: '0 2px 12px rgba(46,31,71,.05)' }}>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-medium text-white">Sources gathered</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full"
-                    style={{ background: documents.length >= MAX_VENDORS ? 'rgba(244,63,94,.15)' : 'rgba(56,189,248,.15)',
-                      color: documents.length >= MAX_VENDORS ? '#fb7185' : '#38bdf8' }}>
+                  <span className="text-sm font-medium text-[#2b1d3f]">Sources gathered</span>
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full"
+                    style={{ background: documents.length >= MAX_VENDORS ? 'rgba(244,63,94,.12)' : 'rgba(124,58,237,.10)',
+                      color: documents.length >= MAX_VENDORS ? '#e5484d' : '#7c3aed' }}>
                     {documents.length} / {MAX_VENDORS} files · {goodCount} vendor{goodCount !== 1 ? 's' : ''}
                   </span>
                   {documents.length >= MAX_VENDORS && (
-                    <span className="text-xs" style={{ color: '#fb7185' }}>Limit of {MAX_VENDORS} reached</span>
+                    <span className="text-xs" style={{ color: '#f43f5e' }}>Limit of {MAX_VENDORS} reached</span>
                   )}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {documents.map((d, i) => {
                     const noise = !d.is_vendor
                     return (
-                      <div key={i} className="flex items-start gap-2 rounded-xl px-3 py-2"
+                      <div key={i} className="flex items-start gap-2.5 rounded-xl px-3.5 py-2.5"
                         style={{
-                          background: noise ? 'rgba(248,63,94,.08)' : 'rgba(255,255,255,.04)',
-                          border: `1px solid ${noise ? 'rgba(248,63,94,.4)' : 'rgba(255,255,255,.1)'}`,
+                          background: noise ? '#fef2f2' : '#ffffff',
+                          border: `1px solid ${noise ? 'rgba(244,63,94,.35)' : 'rgba(124,58,237,.14)'}`,
+                          boxShadow: noise ? 'none' : '0 1px 3px rgba(46,31,71,.05)',
                         }}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                          stroke={noise ? '#fb7185' : '#818cf8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                          stroke={noise ? '#f43f5e' : '#b794f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                           className="mt-0.5 shrink-0">
                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                         </svg>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm truncate" style={{ color: noise ? '#fb7185' : '#e5e7eb' }}>{d.name}</span>
+                            <span className="text-sm truncate" style={{ color: noise ? '#f43f5e' : '#2b1d3f' }}>{d.name}</span>
                             {noise && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded-full"
-                                style={{ background: 'rgba(248,63,94,.18)', color: '#fb7185' }}>likely not a vendor</span>
+                                style={{ background: 'rgba(248,63,94,.18)', color: '#f43f5e' }}>likely not a vendor</span>
                             )}
                           </div>
                           {noise && (
-                            <p className="text-[11px] mt-0.5" style={{ color: '#9ca3af' }}>
+                            <p className="text-[11px] mt-0.5" style={{ color: '#6f6385' }}>
                               {d.reason || 'Does not look like a vendor document.'} Remove it, or keep it to feed its content to the board.
                             </p>
                           )}
                         </div>
                         <button onClick={() => removeDoc(d.name)} title="Remove"
-                          className="shrink-0 p-1 rounded-md" style={{ color: '#9ca3af' }}>
+                          className="shrink-0 p-1 rounded-md" style={{ color: '#9a8cae' }}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -904,15 +882,15 @@ export default function LandingPage() {
             )}
 
             {documents.length < 2 && (
-              <p className="text-xs text-center mb-2" style={{ color: '#9ca3af' }}>
+              <p className="text-[11px] text-center mb-3" style={{ color: '#a39bb0' }}>
                 Add at least 2 sources (upload files and/or AI search) to start the debate.
               </p>
             )}
             <button
               onClick={goToDashboard}
               disabled={documents.length < 2}
-              className="w-full p-3.5 rounded-2xl text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: '#4f46e5', boxShadow: documents.length >= 2 ? '0 0 15px rgba(79,70,229,.35)' : 'none' }}
+              className="w-full p-3.5 rounded-2xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:scale-[1.01] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              style={{ background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', boxShadow: documents.length >= 2 ? '0 8px 22px rgba(124,58,237,.28)' : 'none' }}
             >
               Continue to debate
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -929,7 +907,7 @@ export default function LandingPage() {
         id="bottom-bar-container"
         className="absolute bottom-0 w-full p-4 md:p-8 z-30"
         style={{
-          background: 'linear-gradient(to top, #050505 60%, transparent)',
+          background: 'linear-gradient(to top, #faf7fe 60%, transparent)',
           opacity: step === 1 ? 1 : 0,
           transform: step === 1 ? 'translateY(0)' : 'translateY(20px)',
           pointerEvents: step === 1 ? 'auto' : 'none',
@@ -946,14 +924,14 @@ export default function LandingPage() {
               onKeyDown={handleKeyDown}
               placeholder="Type your requirements here..."
               className="flex-1 bg-transparent border-none outline-none font-light px-4 py-1.5"
-              style={{ color: '#ffffff' }}
+              style={{ color: '#2b1d3f' }}
               autoComplete="off"
             />
             <button
               onClick={goToStep2}
               disabled={!requirements.trim()}
               className="p-2.5 text-white rounded-full shadow-lg mr-1 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              style={{ background: requirements.trim() ? '#4f46e5' : '#4f46e5' }}
+              style={{ background: requirements.trim() ? '#7c3aed' : '#7c3aed' }}
               title="Submit Requirements"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -970,7 +948,7 @@ export default function LandingPage() {
       <div
         className="fixed inset-0 z-40"
         style={{
-          background: 'rgba(0,0,0,.6)',
+          background: 'rgba(46,31,71,.42)',
           backdropFilter: 'blur(6px)',
           opacity: isPanelOpen ? 1 : 0,
           pointerEvents: isPanelOpen ? 'auto' : 'none',
@@ -988,6 +966,9 @@ export default function LandingPage() {
           width: '100%',
           maxWidth: '440px',
           maxHeight: '80vh',
+          background: 'linear-gradient(180deg, #ffffff 0%, #fdfbff 100%)',
+          border: '1px solid rgba(124,58,237,.14)',
+          boxShadow: '0 24px 60px rgba(46,31,71,.22)',
           transform: isPanelOpen
             ? 'translate(-50%, -50%) scale(1)'
             : 'translate(-50%, -50%) scale(0.94)',
@@ -1001,7 +982,7 @@ export default function LandingPage() {
           <button
             onClick={() => setIsPanelOpen(false)}
             className="p-2 rounded-full transition-colors"
-            style={{ color: '#9ca3af' }}
+            style={{ color: '#9a8cae' }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1010,7 +991,7 @@ export default function LandingPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-3 pb-6 pr-2">
+        <div className="flex-1 overflow-y-auto space-y-3.5 pb-6 pr-2">
           {ALL_AGENTS.map(id => {
             const meta = AGENT_META[id]
             const c = colorMap[meta.color]
@@ -1021,7 +1002,11 @@ export default function LandingPage() {
               <div
                 key={id}
                 className={`agent-card rounded-2xl group transition-all${isSelected ? ' selected' : ''}`}
-                style={{ border: '1px solid rgba(55,65,81,.5)', background: 'rgba(255,255,255,.05)' }}
+                style={{
+                  border: isSelected ? '1px solid rgba(124,58,237,.45)' : '1px solid rgba(124,58,237,.16)',
+                  background: isSelected ? 'rgba(124,58,237,.06)' : '#ffffff',
+                  boxShadow: isSelected ? '0 4px 16px rgba(124,58,237,.16)' : '0 1px 3px rgba(46,31,71,.06)',
+                }}
               >
                 {/* Header — click to select/deselect */}
                 <div className="p-4 flex items-center gap-4 cursor-pointer" onClick={() => toggleAgent(id)}>
@@ -1030,53 +1015,55 @@ export default function LandingPage() {
                     {meta.icon}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-medium" style={{ color: '#e5e7eb' }}>{meta.label}</div>
-                    <div className="text-xs" style={{ color: '#9ca3af' }}>{meta.sub}</div>
+                    <div className="font-medium" style={{ color: '#1f1530' }}>{meta.label}</div>
+                    <div className="text-xs" style={{ color: '#6f6385' }}>{meta.sub}</div>
                   </div>
                   <div className="ml-auto flex items-center gap-2 shrink-0">
                     <button type="button"
                       onClick={e => { e.stopPropagation(); setExpandedAgent(open ? null : id) }}
-                      className="text-[11px] px-2 py-1 rounded-md font-medium"
-                      style={{ background: open ? 'rgba(129,140,248,.2)' : 'rgba(255,255,255,.06)', color: open ? '#a5b4fc' : '#9ca3af' }}>
+                      className="text-[11px] px-2.5 py-1 rounded-lg font-semibold transition-all hover:brightness-110"
+                      style={open
+                        ? { background: 'rgba(124,58,237,.10)', color: '#7c3aed', border: '1px solid rgba(124,58,237,.28)' }
+                        : { background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', boxShadow: '0 3px 10px rgba(124,58,237,.28)' }}>
                       {open ? 'Done' : 'Customize'}
                     </button>
                     <div className="w-5 h-5 rounded-full border flex items-center justify-center transition-opacity"
-                      style={{ borderColor: '#6b7280', opacity: isSelected ? 1 : 0 }}>
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#818cf8' }} />
+                      style={{ borderColor: '#6f6385', opacity: isSelected ? 1 : 0 }}>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#b794f6' }} />
                     </div>
                   </div>
                 </div>
 
                 {/* Customization panel */}
                 {open && (
-                  <div className="px-4 pb-4 pt-1 space-y-3" style={{ borderTop: '1px solid rgba(55,65,81,.5)' }}>
-                    <p className="text-[11px] mt-3" style={{ color: '#6b7280' }}>
+                  <div className="px-4 pb-4 pt-1 space-y-3" style={{ borderTop: '1px solid rgba(124,58,237,.12)' }}>
+                    <p className="text-[11px] mt-3" style={{ color: '#6f6385' }}>
                       Keeps its {meta.sub.toLowerCase()} focus — adjust how it behaves:
                     </p>
                     <div>
-                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9ca3af' }}>Tone</p>
+                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9a8cae' }}>Tone</p>
                       <Seg options={TONE_OPTS} value={cfg.tone} onChange={v => updateConfig(id, { tone: v })} />
                     </div>
                     <div>
-                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9ca3af' }}>Risk tolerance</p>
+                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9a8cae' }}>Risk tolerance</p>
                       <Seg options={RISK_OPTS} value={cfg.risk} onChange={v => updateConfig(id, { risk: v })} />
                     </div>
                     <div>
-                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9ca3af' }}>Decision style</p>
+                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9a8cae' }}>Decision style</p>
                       <Seg options={DECISION_OPTS} value={cfg.decision} onChange={v => updateConfig(id, { decision: v })} />
                     </div>
                     <div>
-                      <div className="flex justify-between text-[11px] mb-1" style={{ color: '#9ca3af' }}>
+                      <div className="flex justify-between text-[11px] mb-1" style={{ color: '#9a8cae' }}>
                         <span className="font-semibold">Priority</span>
                         <span>Stability ↔ Innovation</span>
                       </div>
                       <input type="range" min={0} max={100} step={5} value={cfg.priority}
                         onChange={e => updateConfig(id, { priority: Number(e.target.value) })}
                         className="w-full h-1.5 rounded-full cursor-pointer"
-                        style={{ accentColor: '#818cf8', background: '#21262d' }} />
+                        style={{ accentColor: '#b794f6', background: '#f3ecfb' }} />
                     </div>
                     <div>
-                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9ca3af' }}>Communication</p>
+                      <p className="text-[11px] font-semibold mb-1" style={{ color: '#9a8cae' }}>Communication</p>
                       <Seg options={COMM_OPTS} value={cfg.communication} onChange={v => updateConfig(id, { communication: v })} />
                     </div>
                   </div>
@@ -1086,21 +1073,21 @@ export default function LandingPage() {
           })}
         </div>
 
-        <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(55,65,81,.5)' }}>
+        <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(124,58,237,.12)' }}>
           <button
             onClick={handleSelectAll}
-            className="w-full p-3 rounded-xl text-sm font-medium transition-colors mb-2"
-            style={{ background: '#1f2937' }}
+            className="w-full p-3 rounded-xl text-sm font-semibold transition-all hover:brightness-105 mb-2.5"
+            style={{ background: 'rgba(124,58,237,.10)', color: '#7c3aed', border: '1px solid rgba(124,58,237,.22)' }}
           >
             {selectedAgents.size === ALL_AGENTS.length ? 'Deselect All' : 'Select All Agents'}
           </button>
           <button
             onClick={goToStep3}
             disabled={selectedAgents.size === 0}
-            className="w-full p-3 rounded-xl text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full p-3.5 rounded-xl text-white text-sm font-semibold transition-all hover:scale-[1.01] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             style={{
-              background: '#4f46e5',
-              boxShadow: selectedAgents.size > 0 ? '0 0 15px rgba(79,70,229,.4)' : 'none',
+              background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)',
+              boxShadow: selectedAgents.size > 0 ? '0 8px 22px rgba(124,58,237,.28)' : 'none',
             }}
           >
             Apply Selection
@@ -1112,7 +1099,7 @@ export default function LandingPage() {
       <div
         className="fixed inset-0 z-40"
         style={{
-          background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)',
+          background: 'rgba(46,31,71,.42)', backdropFilter: 'blur(6px)',
           opacity: searchOpen ? 1 : 0,
           pointerEvents: searchOpen ? 'auto' : 'none',
           transition: 'opacity .3s ease',
@@ -1120,9 +1107,12 @@ export default function LandingPage() {
         onClick={() => !searchLoading && setSearchOpen(false)}
       />
       <aside
-        className="glass-panel fixed z-50 flex flex-col rounded-3xl p-6"
+        className="glass-panel fixed z-50 flex flex-col rounded-3xl p-7"
         style={{
           top: '50%', left: '50%', width: '100%', maxWidth: '460px',
+          background: 'linear-gradient(180deg, #ffffff 0%, #fdfbff 100%)',
+          border: '1px solid rgba(124,58,237,.14)',
+          boxShadow: '0 24px 60px rgba(46,31,71,.22)',
           transform: searchOpen ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.94)',
           opacity: searchOpen ? 1 : 0,
           pointerEvents: searchOpen ? 'auto' : 'none',
@@ -1132,7 +1122,7 @@ export default function LandingPage() {
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-medium">Find vendors with AI</h2>
           {!searchLoading && (
-            <button onClick={() => setSearchOpen(false)} className="p-2 rounded-full" style={{ color: '#9ca3af' }}>
+            <button onClick={() => setSearchOpen(false)} className="p-2 rounded-full" style={{ color: '#9a8cae' }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 6 6 18" /><path d="m6 6 12 12" />
@@ -1140,44 +1130,44 @@ export default function LandingPage() {
             </button>
           )}
         </div>
-        <p className="text-sm mb-5" style={{ color: '#9ca3af' }}>
+        <p className="text-sm mb-6 leading-relaxed" style={{ color: '#574f63' }}>
           Tell the agent what kind of vendors to look for. It will find up to 4 real options and
           add their details to the brief sent to your AI board.
         </p>
 
-        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#574f63' }}>
           What field / category should we search?
-          {documents.length > 0 && <span style={{ color: '#6b7280' }}> (optional)</span>}
+          {documents.length > 0 && <span style={{ color: '#6f6385' }}> (optional)</span>}
         </label>
         <input
           value={searchField}
           onChange={e => setSearchField(e.target.value)}
           placeholder="e.g. project management software, CRM, helpdesk"
           className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mb-1.5"
-          style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
+          style={{ background: '#faf8fe', border: '1px solid rgba(124,58,237,.22)', color: '#2b1d3f' }}
           autoFocus
         />
         {documents.length > 0 && (
-          <p className="text-[11px] mb-4" style={{ color: '#818cf8' }}>
+          <p className="text-[11px] mb-4" style={{ color: '#7c3aed' }}>
             Leave blank to find vendors comparable to your uploaded files (good files only).
           </p>
         )}
         {documents.length === 0 && <div className="mb-4" />}
 
-        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
-          Specific vendors to include <span style={{ color: '#6b7280' }}>(optional, comma-separated)</span>
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#574f63' }}>
+          Specific vendors to include <span style={{ color: '#6f6385' }}>(optional, comma-separated)</span>
         </label>
         <input
           value={searchInclude}
           onChange={e => setSearchInclude(e.target.value)}
           placeholder="e.g. Asana, Jira"
           className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mb-4"
-          style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
+          style={{ background: '#faf8fe', border: '1px solid rgba(124,58,237,.22)', color: '#2b1d3f' }}
         />
 
-        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#574f63' }}>
           How many vendors to add?{' '}
-          <span style={{ color: '#6b7280' }}>
+          <span style={{ color: '#6f6385' }}>
             {documents.length > 0
               ? `(${MAX_VENDORS - documents.length} slot${MAX_VENDORS - documents.length !== 1 ? 's' : ''} left — already have ${documents.length})`
               : '(max 4)'}
@@ -1186,11 +1176,12 @@ export default function LandingPage() {
         <div className="flex gap-2 mb-6">
           {Array.from({ length: Math.max(1, MAX_VENDORS - documents.length) }, (_, i) => i + 1).map(n => (
             <button key={n} onClick={() => setSearchCount(n)}
-              className="flex-1 py-2 rounded-xl text-sm font-medium transition-colors"
+              className="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
               style={{
-                background: searchCount === n ? '#4f46e5' : 'rgba(255,255,255,.05)',
-                border: `1px solid ${searchCount === n ? '#6366f1' : 'rgba(255,255,255,.12)'}`,
-                color: '#fff',
+                background: searchCount === n ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#faf8fe',
+                border: `1px solid ${searchCount === n ? 'transparent' : 'rgba(124,58,237,.18)'}`,
+                color: searchCount === n ? '#fff' : '#574f63',
+                boxShadow: searchCount === n ? '0 4px 12px rgba(124,58,237,.26)' : 'none',
               }}>
               {n}
             </button>
@@ -1200,8 +1191,8 @@ export default function LandingPage() {
         <button
           onClick={handleVendorSearch}
           disabled={(!searchField.trim() && documents.length === 0) || searchLoading}
-          className="w-full p-3 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ background: '#4f46e5', boxShadow: (searchField.trim() || documents.length > 0) ? '0 0 15px rgba(79,70,229,.4)' : 'none' }}
+          className="w-full p-3.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:scale-[1.01] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          style={{ background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', boxShadow: (searchField.trim() || documents.length > 0) ? '0 8px 22px rgba(124,58,237,.28)' : 'none' }}
         >
           {searchLoading ? (<><SpinnerIcon /> Searching for vendors…</>) : (<>Find Vendors &amp; Continue</>)}
         </button>
@@ -1211,7 +1202,7 @@ export default function LandingPage() {
       <div
         className="fixed inset-0 z-40"
         style={{
-          background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)',
+          background: 'rgba(46,31,71,.42)', backdropFilter: 'blur(6px)',
           opacity: typeOpen ? 1 : 0,
           pointerEvents: typeOpen ? 'auto' : 'none',
           transition: 'opacity .3s ease',
@@ -1219,9 +1210,12 @@ export default function LandingPage() {
         onClick={() => !typeLoading && setTypeOpen(false)}
       />
       <aside
-        className="glass-panel fixed z-50 flex flex-col rounded-3xl p-6"
+        className="glass-panel fixed z-50 flex flex-col rounded-3xl p-7"
         style={{
           top: '50%', left: '50%', width: '100%', maxWidth: '480px', maxHeight: '85vh',
+          background: 'linear-gradient(180deg, #ffffff 0%, #fdfbff 100%)',
+          border: '1px solid rgba(124,58,237,.14)',
+          boxShadow: '0 24px 60px rgba(46,31,71,.22)',
           transform: typeOpen ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.94)',
           opacity: typeOpen ? 1 : 0,
           pointerEvents: typeOpen ? 'auto' : 'none',
@@ -1230,30 +1224,30 @@ export default function LandingPage() {
       >
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-medium">Enter vendor details</h2>
-          <button onClick={() => setTypeOpen(false)} className="p-2 rounded-full" style={{ color: '#9ca3af' }}>
+          <button onClick={() => setTypeOpen(false)} className="p-2 rounded-full" style={{ color: '#9a8cae' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 6 6 18" /><path d="m6 6 12 12" />
             </svg>
           </button>
         </div>
-        <p className="text-sm mb-4" style={{ color: '#9ca3af' }}>
+        <p className="text-sm mb-5 leading-relaxed" style={{ color: '#574f63' }}>
           No documents? Type the vendor&rsquo;s details below. Each entry is added as a separate
           vendor source (up to {MAX_VENDORS} total) and is evaluated exactly like an uploaded file.
         </p>
 
-        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
-          Vendor name <span style={{ color: '#6b7280' }}>(optional)</span>
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#574f63' }}>
+          Vendor name <span style={{ color: '#6f6385' }}>(optional)</span>
         </label>
         <input
           value={typeName}
           onChange={e => setTypeName(e.target.value)}
           placeholder="e.g. Acme PM Suite"
           className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mb-4"
-          style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
+          style={{ background: '#faf8fe', border: '1px solid rgba(124,58,237,.22)', color: '#2b1d3f' }}
         />
 
-        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#9ca3af' }}>
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#574f63' }}>
           Type vendor details here
         </label>
         <textarea
@@ -1261,16 +1255,16 @@ export default function LandingPage() {
           onChange={e => setTypeText(e.target.value)}
           rows={6}
           placeholder="Pricing, key features, integrations, security/compliance, hosting, support… anything the board should weigh."
-          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-y mb-2"
-          style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: '#fff' }}
+          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-y mb-3"
+          style={{ background: '#faf8fe', border: '1px solid rgba(124,58,237,.22)', color: '#2b1d3f' }}
         />
 
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-xs" style={{ color: '#6b7280' }}>
+        <div className="flex items-center justify-between mb-5">
+          <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(124,58,237,.06)', color: '#574f63' }}>
             {documents.length} / {MAX_VENDORS} sources gathered
           </span>
           {documents.length >= MAX_VENDORS && (
-            <span className="text-xs" style={{ color: '#fb7185' }}>Limit reached</span>
+            <span className="text-xs" style={{ color: '#f43f5e' }}>Limit reached</span>
           )}
         </div>
 
@@ -1278,15 +1272,15 @@ export default function LandingPage() {
           <button
             onClick={handleAddTypedVendor}
             disabled={!typeText.trim() || typeLoading || documents.length >= MAX_VENDORS}
-            className="flex-1 p-3 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: '#059669', boxShadow: typeText.trim() && documents.length < MAX_VENDORS ? '0 0 15px rgba(5,150,105,.4)' : 'none' }}
+            className="flex-1 p-3.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:scale-[1.01] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            style={{ background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', boxShadow: typeText.trim() && documents.length < MAX_VENDORS ? '0 8px 22px rgba(124,58,237,.28)' : 'none' }}
           >
             {typeLoading ? (<><SpinnerIcon /> Adding…</>) : (<>+ Add vendor</>)}
           </button>
           <button
             onClick={() => setTypeOpen(false)}
-            className="px-4 p-3 rounded-xl text-sm font-medium"
-            style={{ background: '#1f2937', color: '#e5e7eb' }}
+            className="px-4 p-3.5 rounded-xl text-sm font-semibold transition-colors hover:brightness-95"
+            style={{ background: '#f3ecfb', color: '#574f63' }}
           >
             Done
           </button>
@@ -1300,8 +1294,8 @@ export default function LandingPage() {
           {!assistantOpen && (
             <button
               onClick={() => setAssistantOpen(true)}
-              className="fixed z-40 flex items-center gap-2 rounded-full px-4 py-3 shadow-lg transition-transform hover:scale-105"
-              style={{ bottom: 24, right: 24, background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff' }}
+              className="fixed z-40 flex items-center gap-2 rounded-full px-5 py-3 transition-all hover:scale-105 hover:brightness-110"
+              style={{ bottom: 24, right: 24, background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', boxShadow: '0 10px 26px rgba(124,58,237,.34)' }}
               title="Need help defining your requirements?"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -1318,19 +1312,19 @@ export default function LandingPage() {
               style={{ bottom: 24, right: 24, width: 'min(380px, calc(100vw - 32px))', height: 'min(560px, 72vh)' }}>
               {/* Header */}
               <div className="flex items-center gap-2 px-4 py-3 shrink-0"
-                style={{ borderBottom: '1px solid rgba(255,255,255,.1)', background: 'rgba(124,58,237,.12)' }}>
+                style={{ borderBottom: '1px solid rgba(124,58,237,.14)', background: 'rgba(124,58,237,.12)' }}>
                 <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+                  style={{ background: 'linear-gradient(135deg,#7c3aed,#7c3aed)' }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                     stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                 </div>
                 <div className="leading-tight">
-                  <p className="text-sm font-semibold text-white">Requirements Assistant</p>
-                  <p className="text-[11px]" style={{ color: '#9ca3af' }}>Helps you define what to buy</p>
+                  <p className="text-sm font-semibold text-[#2b1d3f]">Requirements Assistant</p>
+                  <p className="text-[11px]" style={{ color: '#9a8cae' }}>Helps you define what to buy</p>
                 </div>
-                <button onClick={() => setAssistantOpen(false)} className="ml-auto p-1.5 rounded-lg" style={{ color: '#9ca3af' }}>
+                <button onClick={() => setAssistantOpen(false)} className="ml-auto p-1.5 rounded-lg" style={{ color: '#9a8cae' }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 6 6 18" /><path d="m6 6 12 12" />
@@ -1345,8 +1339,8 @@ export default function LandingPage() {
                     <div className="max-w-[85%]">
                       <div className="rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap"
                         style={m.role === 'user'
-                          ? { background: '#4f46e5', color: '#fff', borderBottomRightRadius: 4 }
-                          : { background: 'rgba(255,255,255,.06)', color: '#e5e7eb', border: '1px solid rgba(255,255,255,.1)', borderBottomLeftRadius: 4 }}>
+                          ? { background: '#7c3aed', color: '#fff', borderBottomRightRadius: 4 }
+                          : { background: 'rgba(124,58,237,.06)', color: '#ece0f7', border: '1px solid rgba(124,58,237,.14)', borderBottomLeftRadius: 4 }}>
                         {m.content}
                       </div>
                       {m.role === 'assistant' && i > 0 && (
@@ -1362,7 +1356,7 @@ export default function LandingPage() {
                 {assistantLoading && (
                   <div className="flex justify-start">
                     <div className="rounded-2xl px-4 py-3 flex items-center gap-1.5"
-                      style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)' }}>
+                      style={{ background: 'rgba(124,58,237,.06)', border: '1px solid rgba(124,58,237,.14)' }}>
                       <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
                     </div>
                   </div>
@@ -1371,20 +1365,20 @@ export default function LandingPage() {
               </div>
 
               {/* Input */}
-              <div className="p-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,.1)' }}>
+              <div className="p-3 shrink-0" style={{ borderTop: '1px solid rgba(124,58,237,.14)' }}>
                 <div className="flex items-end gap-2 rounded-2xl p-1.5"
-                  style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)' }}>
+                  style={{ background: 'rgba(124,58,237,.05)', border: '1px solid rgba(124,58,237,.14)' }}>
                   <input
                     value={assistantInput}
                     onChange={e => setAssistantInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') sendAssistant() }}
                     placeholder="Ask anything about your requirements…"
                     className="flex-1 bg-transparent border-none outline-none text-sm px-2 py-1.5"
-                    style={{ color: '#fff' }}
+                    style={{ color: '#2b1d3f' }}
                   />
                   <button onClick={sendAssistant} disabled={!assistantInput.trim() || assistantLoading}
                     className="p-2 rounded-xl text-white shrink-0 disabled:opacity-50"
-                    style={{ background: '#4f46e5' }}>
+                    style={{ background: '#7c3aed' }}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="5" x2="19" y1="12" y2="12" /><polyline points="12 5 19 12 12 19" />

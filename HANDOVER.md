@@ -303,11 +303,20 @@ state, so the hook's `loading` is destructured as `vapiLoading` there. Config: `
 The assistant id is committed in code/handover; the **public key must be filled into `.env.local`** and
 the dev server restarted (`NEXT_PUBLIC_*` is read at build/dev-start only).
 
-**Styling**: dark palette `#050505`/`#0d1117`/`#161b22`/`#30363d`, text `#e6edf3`/`#8b949e`/`#c9d1d9`,
-accents `#58a6ff`/`#818cf8`/`#a371f7`, green `#3fb950`, red `#f85149`, amber `#d29922`. Theme CSS
-vars (`--app-bg`, `--nav-bg`, `--panel`, etc.) in `globals.css` flip on `html.light`. The navbar +
-app shell share `--app-bg = #050505` (seamless, no border). Reusable keyframes: `breathe`,
+**Styling**: **ORCHID light theme** (redesigned this session — the whole app was flipped from the old
+dark palette to a clean white/orchid-purple/soft-yellow look). Base = white `#ffffff` / very light
+lavender `#faf8fe` / `#faf7fe`; panels white with soft purple borders `rgba(124,58,237,.14–.22)` and
+subtle shadows. Text = dark plum `#160f24`/`#2b1d3f`/`#574f63`/`#6f6385` (dark-on-white, high contrast).
+Brand accent = orchid purple `#7c3aed`/`#8b5cf6`/`#a855f7`/`#b794f6`; primary CTA = `linear-gradient(135deg,#8b5cf6,#7c3aed)`
+pill + soft shadow `0 8px 22px rgba(124,58,237,.28)` + `hover:scale/brightness` (this pattern is reused
+on EVERY primary button). Yellow `#eab308`/`#facc15`/`#f5c518` is a tiny micro-accent only. Semantic
+green/red kept (deepened for white bg). **Typography**: Sora (headings, via `next/font` in `layout.tsx`,
+applied to `h1–h6` in `globals.css`) + Inter (body). The old dark hex (`#050505`/`#161b22`/`#e6edf3`/
+`#58a6ff`/…) was remapped wholesale; theme CSS vars (`--app-bg`/`--panel`/`--text`/…) in `globals.css`
+now hold light values (the immersive Home/Debate views also use white now, not "dark by design"). Navbar
+is a **frosted** `rgba(255,255,255,.72)` + blur + purple-active. Reusable keyframes: `breathe`,
 `pulse-ring`, `float`, `core-glow`, `node-twinkle`, `fade-in-up`, `turn-in`, `typing-bounce`.
+NOTE: the landing orb removed its decorative pulse-rings; `core-glow`/`bg-mesh` were softened.
 
 ---
 
@@ -386,8 +395,18 @@ When you make new changes, update this section (and the rest of this file) accor
 
 ## 11. Known limitations / honest caveats
 
-- **Light mode** only fully themes the navbar/Projects/Settings; the immersive Home & Debate views
-  stay dark by design. Full light theming is a follow-up.
+- **Theme**: the whole app is now the **orchid LIGHT theme** (see §8). The dark/light toggle in
+  Settings still works mechanically but "dark" is largely cosmetic now since everything was rebuilt
+  light. The light-orchid look is hardcoded in many inline styles (not just CSS vars), so a true dark
+  mode would need real rework.
+- **Wizard scroll fix**: `.step-container` (globals.css) got `max-height: calc(100vh - 3.5rem)` +
+  `overflow-y: auto` so tall steps (e.g. Step 3 after AI search) scroll internally instead of clipping
+  inside the `overflow-hidden` main.
+- **Print-to-PDF blank pages fix**: the `@media print` block in globals.css now fully unwraps every
+  ancestor between `<body>` and `#decision-report` (`display:block`/`static`/`flex:none`/height-auto on
+  `body`, `body > div`, `main`, `.report-overlay`, `.report-scroll`) and `display:none`s the navbar +
+  all `main > *:not(.report-overlay)`. `visibility:hidden` alone had kept those boxes' layout space →
+  leading blank pages. (Browser print CSS may need a HARD refresh to reload.)
 - **Language** setting is a stored preference only — no i18n strings are wired (UI stays English).
 - **Profile/sign-in** is localStorage only — no real auth backend.
 - **Negotiation email lookup** may hallucinate plausible addresses — UI tells the user to verify.

@@ -36,12 +36,12 @@ export default function DecisionMatrix({
 
   // Palette per variant
   const c = print
-    ? { card: '#ffffff', border: '#e5e7eb', head: '#1f2747', headText: '#ffffff', text: '#111827',
-        dim: '#6b7280', sub: '#374151', good: '#15803d', fail: '#b91c1c', mand: '#b45309',
-        rowAlt: '#f6f8fb', win: '#f0fdf4', winBorder: '#bbf7d0' }
-    : { card: '#161b22', border: '#30363d', head: '#0d1117', headText: '#e6edf3', text: '#e6edf3',
-        dim: '#8b949e', sub: '#c9d1d9', good: '#3fb950', fail: '#f85149', mand: '#d29922',
-        rowAlt: 'rgba(255,255,255,.02)', win: 'rgba(63,185,80,.08)', winBorder: '#3fb950' }
+    ? { card: '#ffffff', border: '#ece0f7', head: '#2e1f47', headText: '#ffffff', text: '#241634',
+        dim: '#6f6385', sub: '#3d2f50', good: '#15803d', fail: '#b91c1c', mand: '#b45309',
+        rowAlt: '#faf7fe', win: '#f0fdf4', winBorder: '#bbf7d0' }
+    : { card: '#ffffff', border: '#e6d8f6', head: '#f4eefb', headText: '#2b1d3f', text: '#2b1d3f',
+        dim: '#8a7ca0', sub: '#4a3a5e', good: '#1f9d57', fail: '#e5484d', mand: '#eab308',
+        rowAlt: 'rgba(255,255,255,.02)', win: 'rgba(63,185,80,.08)', winBorder: '#1f9d57' }
 
   const th: React.CSSProperties = {
     background: c.head, color: c.headText, fontSize: print ? 9 : 11, fontWeight: 700,
@@ -59,7 +59,7 @@ export default function DecisionMatrix({
           <th style={{ ...th, textAlign: 'left', width: print ? '24%' : '22%' }}>Requirement</th>
           <th style={{ ...th, width: '9%' }}>Weight</th>
           {vendors.map(v => (
-            <th key={v} style={{ ...th, background: v === winner ? (print ? '#15803d' : '#1f4a2a') : c.head }}>
+            <th key={v} style={{ ...th, background: v === winner ? (print ? '#15803d' : '#dcf3e4') : c.head }}>
               {v}{v === winner ? ' 🏆' : ''}
             </th>
           ))}
@@ -95,7 +95,7 @@ export default function DecisionMatrix({
           </tr>
         ))}
         {/* Totals */}
-        <tr style={{ borderTop: `2px solid ${print ? '#1f2747' : '#3fb950'}` }}>
+        <tr style={{ borderTop: `2px solid ${print ? '#2e1f47' : '#1f9d57'}` }}>
           <td style={{ ...td, fontWeight: 800, color: c.text }}>Total weighted score</td>
           <td style={{ ...td }} />
           {vendors.map(v => (
@@ -120,12 +120,12 @@ export default function DecisionMatrix({
         <h3 style={{
           display: 'flex', alignItems: 'center', gap: 8,
           fontSize: print ? 11 : 16, fontWeight: 700,
-          color: print ? '#6b7280' : c.text,
+          color: print ? '#6f6385' : c.text,
           textTransform: print ? 'uppercase' : 'none',
           letterSpacing: print ? '0.06em' : undefined,
           marginBottom: print ? 8 : 12,
         }}>
-          {!print && <Grid3x3 className="w-5 h-5" style={{ color: '#58a6ff' }} />}
+          {!print && <Grid3x3 className="w-5 h-5" style={{ color: '#9b6cf5' }} />}
           Purchase Decision Matrix
         </h3>
       </div>
@@ -136,7 +136,7 @@ export default function DecisionMatrix({
           padding: print ? '8px 10px' : '10px 12px',
           borderRadius: 8,
           background: print ? '#fef2f2' : 'rgba(248,81,73,.08)',
-          border: `1px solid ${print ? '#fecaca' : '#f85149'}`,
+          border: `1px solid ${print ? '#fecaca' : '#e5484d'}`,
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <AlertTriangle style={{ width: print ? 12 : 16, height: print ? 12 : 16, color: c.fail, flexShrink: 0 }} />

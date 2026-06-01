@@ -19,7 +19,7 @@ export default function ProjectsPage() {
     <main className="min-h-full" style={{ background: 'var(--app-bg)' }}>
       <div className="max-w-4xl mx-auto px-6 py-10">
         <div className="flex items-center gap-3 mb-1">
-          <FolderKanban className="w-6 h-6" style={{ color: '#818cf8' }} />
+          <FolderKanban className="w-6 h-6" style={{ color: '#b794f6' }} />
           <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text)' }}>Projects</h1>
         </div>
         <p className="text-sm mb-8" style={{ color: 'var(--text-dim)' }}>
@@ -36,7 +36,7 @@ export default function ProjectsPage() {
             </p>
             <button onClick={() => (window.location.href = '/?new=1')}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white"
-              style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)' }}>
+              style={{ background: 'linear-gradient(135deg,#7c3aed,#7c3aed)' }}>
               <Plus className="w-4 h-4" /> New analysis
             </button>
           </div>
@@ -47,14 +47,14 @@ export default function ProjectsPage() {
                 className="group rounded-xl border p-4 flex items-start gap-3 cursor-pointer transition-colors"
                 style={{ background: 'var(--panel)', borderColor: 'var(--panel-border)' }}
                 onClick={() => open(entry)}>
-                <MessageSquare className="w-4 h-4 mt-1 shrink-0" style={{ color: '#818cf8' }} />
+                <MessageSquare className="w-4 h-4 mt-1 shrink-0" style={{ color: '#b794f6' }} />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{entry.summary}</p>
                   {entry.bullets && entry.bullets.length > 0 && (
                     <ul className="mt-1.5 space-y-0.5">
                       {entry.bullets.slice(0, 4).map((b, i) => (
                         <li key={i} className="flex gap-1.5 text-xs" style={{ color: 'var(--text-dim)' }}>
-                          <span style={{ color: '#58a6ff' }}>•</span><span>{b}</span>
+                          <span style={{ color: '#9b6cf5' }}>•</span><span>{b}</span>
                         </li>
                       ))}
                     </ul>
@@ -74,7 +74,7 @@ export default function ProjectsPage() {
                   <button title="Delete"
                     onClick={e => { e.stopPropagation(); removeChat(entry.id) }}
                     className="p-2 rounded-lg" style={{ color: 'var(--text-dim)' }}
-                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#f85149')}
+                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#e5484d')}
                     onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'var(--text-dim)')}>
                     <Trash2 className="w-4 h-4" />
                   </button>

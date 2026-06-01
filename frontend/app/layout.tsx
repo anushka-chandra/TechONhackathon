@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Sora, Inter } from "next/font/google";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
 import { ChatProvider } from "@/context/ChatContext";
@@ -16,6 +16,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Premium type pairing: Sora for headings, Inter for body.
+const sora = Sora({
+  variable: "--font-sora",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Clarity · AI Purchasing Society",
   description: "A Virtual Organization of Specialized AI Agents Simulating Procurement Outcomes",
@@ -27,7 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="h-full flex flex-col overflow-hidden app-shell">
         <ThemeProvider>

@@ -65,11 +65,11 @@ const agentIcons: Record<string, React.ReactNode> = {
 function ConfidenceMeter({ value, color }: { value: number; color: string }) {
   return (
     <div className="mt-3">
-      <div className="flex justify-between text-xs mb-1" style={{ color: '#8b949e' }}>
+      <div className="flex justify-between text-xs mb-1" style={{ color: '#8a7ca0' }}>
         <span>Confidence</span>
         <span style={{ color }}>{value}%</span>
       </div>
-      <div className="h-1.5 rounded-full" style={{ background: '#21262d' }}>
+      <div className="h-1.5 rounded-full" style={{ background: '#f3ecfb' }}>
         <motion.div
           className="h-full rounded-full"
           style={{ background: color }}
@@ -84,7 +84,7 @@ function ConfidenceMeter({ value, color }: { value: number; color: string }) {
 
 function AgentCard({ agent, index }: { agent: Agent; index: number }) {
   const isYes = agent.vote === 'YES'
-  const color = isYes ? '#3fb950' : '#f85149'
+  const color = isYes ? '#1f9d57' : '#e5484d'
 
   return (
     <motion.div
@@ -93,26 +93,26 @@ function AgentCard({ agent, index }: { agent: Agent; index: number }) {
       transition={{ duration: 0.4, delay: index * 0.1 }}
       className="rounded-xl p-4 border flex flex-col gap-1"
       style={{
-        background: 'linear-gradient(135deg, #1c2128 0%, #21262d 100%)',
+        background: 'linear-gradient(135deg, #f6f1fc 0%, #f3ecfb 100%)',
         borderColor: isYes ? 'rgba(63,185,80,0.4)' : 'rgba(248,81,73,0.4)',
       }}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2" style={{ color: '#58a6ff' }}>
+        <div className="flex items-center gap-2" style={{ color: '#9b6cf5' }}>
           {agentIcons[agent.id] ?? <Users className="w-6 h-6" />}
-          <span className="font-bold text-sm" style={{ color: '#e6edf3' }}>{agent.name}</span>
+          <span className="font-bold text-sm" style={{ color: '#2b1d3f' }}>{agent.name}</span>
         </div>
         <span
           className="text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"
-          style={{ background: isYes ? '#1f4a2a' : '#4a1f1f', color }}
+          style={{ background: isYes ? '#dcf3e4' : '#fadddd', color }}
         >
           {isYes ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
           {agent.vote}
         </span>
       </div>
 
-      <p className="text-xs mt-1" style={{ color: '#8b949e' }}>{agent.role}</p>
-      <p className="text-xs mt-1 leading-relaxed" style={{ color: '#c9d1d9' }}>{agent.reasoning}</p>
+      <p className="text-xs mt-1" style={{ color: '#8a7ca0' }}>{agent.role}</p>
+      <p className="text-xs mt-1 leading-relaxed" style={{ color: '#4a3a5e' }}>{agent.reasoning}</p>
 
       <ConfidenceMeter value={agent.confidence} color={color} />
     </motion.div>
@@ -133,21 +133,21 @@ function ScenarioCard({
       style={{ background: bg, borderColor: accent }}
     >
       <p className="font-bold text-sm mb-3" style={{ color: accent }}>{title}</p>
-      <div className="space-y-1.5 text-xs" style={{ color: '#8b949e' }}>
+      <div className="space-y-1.5 text-xs" style={{ color: '#8a7ca0' }}>
         <div className="flex justify-between">
           <span>Adoption</span>
-          <span style={{ color: '#c9d1d9' }}>{data.adoption}</span>
+          <span style={{ color: '#4a3a5e' }}>{data.adoption}</span>
         </div>
         <div className="flex justify-between">
           <span>3-Yr TCO</span>
-          <span style={{ color: '#c9d1d9' }}>{data.tco}</span>
+          <span style={{ color: '#4a3a5e' }}>{data.tco}</span>
         </div>
         <div className="flex justify-between">
           <span>GDPR</span>
-          <span style={{ color: '#c9d1d9' }}>{data.gdpr}</span>
+          <span style={{ color: '#4a3a5e' }}>{data.gdpr}</span>
         </div>
         <p className="mt-2 pt-2 text-xs leading-relaxed"
-          style={{ borderTop: '1px solid #30363d', color: '#8b949e' }}>
+          style={{ borderTop: '1px solid #e6d8f6', color: '#8a7ca0' }}>
           {data.note}
         </p>
       </div>
@@ -161,10 +161,10 @@ function StabilityBar({ vendor, pct, color, delay }: {
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-sm">
-        <span style={{ color: '#e6edf3' }}>{vendor}</span>
+        <span style={{ color: '#2b1d3f' }}>{vendor}</span>
         <span className="font-bold" style={{ color }}>{pct}%</span>
       </div>
-      <div className="h-4 rounded-full overflow-hidden" style={{ background: '#21262d' }}>
+      <div className="h-4 rounded-full overflow-hidden" style={{ background: '#f3ecfb' }}>
         <motion.div
           className="h-full rounded-full"
           style={{ background: `linear-gradient(90deg, ${color}, ${color}cc)` }}
@@ -247,12 +247,12 @@ function DashboardContent() {
   const vendorList = result ? Object.keys(result.decision_stability) : []
 
   return (
-    <main className="min-h-screen" style={{ background: '#0d1117' }}>
+    <main className="min-h-screen" style={{ background: '#f4eefb' }}>
 
       {/* Hero */}
       <div className="border-b" style={{
-        borderColor: '#21262d',
-        background: 'linear-gradient(180deg, #161b22 0%, #0d1117 100%)',
+        borderColor: '#f3ecfb',
+        background: 'linear-gradient(180deg, #ffffff 0%, #f4eefb 100%)',
       }}>
         <div className="max-w-7xl mx-auto px-6 py-10">
           <motion.div
@@ -263,15 +263,15 @@ function DashboardContent() {
             <div className="flex items-center gap-3 mb-2">
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center glow-pulse"
-                style={{ background: 'linear-gradient(135deg, #58a6ff, #388bfd)' }}
+                style={{ background: 'linear-gradient(135deg, #9b6cf5, #8b5cf6)' }}
               >
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-3xl font-black tracking-tight" style={{ color: '#e6edf3' }}>
+              <h1 className="text-3xl font-black tracking-tight" style={{ color: '#2b1d3f' }}>
                 AI Purchasing Society <span className="text-2xl">🏛️</span>
               </h1>
             </div>
-            <p className="text-base ml-[52px]" style={{ color: '#8b949e' }}>
+            <p className="text-base ml-[52px]" style={{ color: '#8a7ca0' }}>
               A Virtual Organization of Specialized AI Agents Simulating Procurement Outcomes.
             </p>
           </motion.div>
@@ -288,12 +288,12 @@ function DashboardContent() {
           className="rounded-2xl border p-6"
           style={{
             background: 'rgba(22, 27, 34, 0.8)',
-            borderColor: '#30363d',
+            borderColor: '#e6d8f6',
             backdropFilter: 'blur(12px)',
           }}
         >
-          <h2 className="font-bold text-lg mb-5 flex items-center gap-2" style={{ color: '#e6edf3' }}>
-            <BarChart3 className="w-5 h-5" style={{ color: '#58a6ff' }} />
+          <h2 className="font-bold text-lg mb-5 flex items-center gap-2" style={{ color: '#2b1d3f' }}>
+            <BarChart3 className="w-5 h-5" style={{ color: '#9b6cf5' }} />
             Procurement Requirements
           </h2>
 
@@ -302,43 +302,43 @@ function DashboardContent() {
               { label: '🎯 Target Category', value: target, setter: setTarget, type: 'text' },
             ].map(({ label, value, setter, type }) => (
               <div key={label}>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8b949e' }}>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8a7ca0' }}>
                   {label}
                 </label>
                 <input
                   type={type}
                   className="w-full rounded-lg px-3 py-2 text-sm border outline-none transition-colors"
-                  style={{ background: '#0d1117', borderColor: '#30363d', color: '#e6edf3' }}
+                  style={{ background: '#f4eefb', borderColor: '#e6d8f6', color: '#2b1d3f' }}
                   value={value}
                   onChange={(e) => setter(e.target.value as never)}
                 />
               </div>
             ))}
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8b949e' }}>👥 Number of Users</label>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8a7ca0' }}>👥 Number of Users</label>
               <input
                 type="number"
                 className="w-full rounded-lg px-3 py-2 text-sm border outline-none transition-colors"
-                style={{ background: '#0d1117', borderColor: '#30363d', color: '#e6edf3' }}
+                style={{ background: '#f4eefb', borderColor: '#e6d8f6', color: '#2b1d3f' }}
                 value={users}
                 onChange={(e) => setUsers(Number(e.target.value))}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8b949e' }}>💶 Annual Budget (€)</label>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8a7ca0' }}>💶 Annual Budget (€)</label>
               <input
                 type="number"
                 className="w-full rounded-lg px-3 py-2 text-sm border outline-none transition-colors"
-                style={{ background: '#0d1117', borderColor: '#30363d', color: '#e6edf3' }}
+                style={{ background: '#f4eefb', borderColor: '#e6d8f6', color: '#2b1d3f' }}
                 value={budget}
                 onChange={(e) => setBudget(Number(e.target.value))}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8b949e' }}>🏢 Vendors (comma-separated)</label>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8a7ca0' }}>🏢 Vendors (comma-separated)</label>
               <input
                 className="w-full rounded-lg px-3 py-2 text-sm border outline-none transition-colors"
-                style={{ background: '#0d1117', borderColor: '#30363d', color: '#e6edf3' }}
+                style={{ background: '#f4eefb', borderColor: '#e6d8f6', color: '#2b1d3f' }}
                 value={vendors}
                 onChange={(e) => setVendors(e.target.value)}
               />
@@ -351,8 +351,8 @@ function DashboardContent() {
             className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{
               background: loading
-                ? '#1f4a2a'
-                : 'linear-gradient(135deg, #238636, #2ea043)',
+                ? '#dcf3e4'
+                : 'linear-gradient(135deg, #15803d, #1f9d57)',
               color: '#ffffff',
               boxShadow: loading ? 'none' : '0 0 20px rgba(46,160,67,0.35)',
             }}
@@ -377,8 +377,8 @@ function DashboardContent() {
               animate={{ opacity: 1 }}
               className="mt-3 text-xs rounded-lg p-3 whitespace-pre-wrap"
               style={{
-                background: '#4a1f1f',
-                color: '#f85149',
+                background: '#fadddd',
+                color: '#e5484d',
                 border: '1px solid rgba(248,81,73,0.3)',
               }}
             >
@@ -406,37 +406,37 @@ function DashboardContent() {
                 transition={{ duration: 0.5 }}
                 className="rounded-2xl border p-8 text-center"
                 style={{
-                  background: 'linear-gradient(135deg, #1a3a1a 0%, #0f2a0f 100%)',
-                  borderColor: '#3fb950',
+                  background: 'linear-gradient(135deg, #e9f7ee 0%, #e9f7ee 100%)',
+                  borderColor: '#1f9d57',
                   boxShadow: '0 0 40px rgba(63,185,80,0.15)',
                 }}
               >
-                <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: '#3fb950' }}>
+                <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: '#1f9d57' }}>
                   Society Verdict — {result.simulation_count.toLocaleString()} Paths Simulated
                 </p>
                 <div className="flex items-center justify-center gap-3 mb-2">
-                  <Trophy className="w-8 h-8" style={{ color: '#d29922' }} />
-                  <h2 className="text-4xl font-black" style={{ color: '#3fb950' }}>{result.winner}</h2>
+                  <Trophy className="w-8 h-8" style={{ color: '#eab308' }} />
+                  <h2 className="text-4xl font-black" style={{ color: '#1f9d57' }}>{result.winner}</h2>
                 </div>
-                <p className="text-lg" style={{ color: '#7ee787' }}>
+                <p className="text-lg" style={{ color: '#34d399' }}>
                   {result.confidence}% Confidence · Recommended Vendor
                 </p>
-                <p className="text-sm mt-3 max-w-2xl mx-auto" style={{ color: '#8b949e' }}>
+                <p className="text-sm mt-3 max-w-2xl mx-auto" style={{ color: '#8a7ca0' }}>
                   {result.recommendation}
                 </p>
               </motion.div>
 
               {/* Agent Boardroom */}
               <div>
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ color: '#e6edf3' }}>
-                  <Users className="w-5 h-5" style={{ color: '#58a6ff' }} />
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ color: '#2b1d3f' }}>
+                  <Users className="w-5 h-5" style={{ color: '#9b6cf5' }} />
                   AI Boardroom Chamber
                   <span className="text-sm font-normal ml-2 px-2 py-0.5 rounded-full"
-                    style={{ background: '#1f4a2a', color: '#3fb950' }}>
+                    style={{ background: '#dcf3e4', color: '#1f9d57' }}>
                     {result.vote_summary.yes} YES
                   </span>
                   <span className="text-sm font-normal px-2 py-0.5 rounded-full"
-                    style={{ background: '#4a1f1f', color: '#f85149' }}>
+                    style={{ background: '#fadddd', color: '#e5484d' }}>
                     {result.vote_summary.no} NO
                   </span>
                 </h3>
@@ -449,20 +449,20 @@ function DashboardContent() {
 
               {/* Metrics Table */}
               <div>
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ color: '#e6edf3' }}>
-                  <TrendingUp className="w-5 h-5" style={{ color: '#58a6ff' }} />
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ color: '#2b1d3f' }}>
+                  <TrendingUp className="w-5 h-5" style={{ color: '#9b6cf5' }} />
                   Vendor Comparison Matrix
                 </h3>
-                <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#30363d' }}>
+                <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#e6d8f6' }}>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr style={{ background: '#161b22' }}>
-                        <th className="text-left px-4 py-3 font-semibold" style={{ color: '#8b949e' }}>
+                      <tr style={{ background: '#ffffff' }}>
+                        <th className="text-left px-4 py-3 font-semibold" style={{ color: '#8a7ca0' }}>
                           Metric
                         </th>
                         {vendorList.map((v) => (
                           <th key={v} className="text-center px-4 py-3 font-semibold"
-                            style={{ color: '#58a6ff' }}>
+                            style={{ color: '#9b6cf5' }}>
                             {v}
                           </th>
                         ))}
@@ -473,14 +473,14 @@ function DashboardContent() {
                         <tr
                           key={i}
                           style={{
-                            background: i % 2 === 0 ? '#0d1117' : '#161b22',
-                            borderTop: '1px solid #21262d',
+                            background: i % 2 === 0 ? '#f4eefb' : '#ffffff',
+                            borderTop: '1px solid #f3ecfb',
                           }}
                         >
-                          <td className="px-4 py-3" style={{ color: '#c9d1d9' }}>{row.label}</td>
+                          <td className="px-4 py-3" style={{ color: '#4a3a5e' }}>{row.label}</td>
                           {vendorList.map((v) => (
                             <td key={v} className="px-4 py-3 text-center font-medium"
-                              style={{ color: row.winner === v ? '#3fb950' : '#8b949e' }}>
+                              style={{ color: row.winner === v ? '#1f9d57' : '#8a7ca0' }}>
                               {row[v]}
                               {row.winner === v && <span className="ml-1 text-xs">✓</span>}
                             </td>
@@ -494,18 +494,18 @@ function DashboardContent() {
 
               {/* Decision Stability */}
               <div>
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ color: '#e6edf3' }}>
-                  <BarChart3 className="w-5 h-5" style={{ color: '#58a6ff' }} />
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ color: '#2b1d3f' }}>
+                  <BarChart3 className="w-5 h-5" style={{ color: '#9b6cf5' }} />
                   Decision Stability Across {result.simulation_count.toLocaleString()} Simulated Futures
                 </h3>
                 <div className="rounded-xl border p-6 space-y-5"
-                  style={{ background: '#161b22', borderColor: '#30363d' }}>
+                  style={{ background: '#ffffff', borderColor: '#e6d8f6' }}>
                   {vendorList.map((v, i) => (
                     <StabilityBar
                       key={v}
                       vendor={v}
                       pct={result.decision_stability[v]}
-                      color={i === 0 ? '#3fb950' : '#58a6ff'}
+                      color={i === 0 ? '#1f9d57' : '#9b6cf5'}
                       delay={i * 0.2}
                     />
                   ))}
@@ -514,28 +514,28 @@ function DashboardContent() {
 
               {/* Scenario Matrix */}
               <div>
-                <h3 className="font-bold text-lg mb-4" style={{ color: '#e6edf3' }}>
+                <h3 className="font-bold text-lg mb-4" style={{ color: '#2b1d3f' }}>
                   🌐 Future Scenario Matrix
                 </h3>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   {vendorList.map((vendor, vi) => (
                     <div key={vendor}>
                       <p className="font-semibold mb-3"
-                        style={{ color: vi === 0 ? '#3fb950' : '#58a6ff' }}>
+                        style={{ color: vi === 0 ? '#1f9d57' : '#9b6cf5' }}>
                         {vi === 0 ? '🟢' : '🔵'} {vendor}
                       </p>
                       <div className="space-y-3">
                         <ScenarioCard title="✨ Best Case"
                           data={result.scenarios[vendor].best}
-                          accent="#3fb950" bg="rgba(26,58,26,0.6)"
+                          accent="#1f9d57" bg="rgba(26,58,26,0.6)"
                           delay={0.1 + vi * 0.05} />
                         <ScenarioCard title="📊 Expected Case"
                           data={result.scenarios[vendor].expected}
-                          accent="#58a6ff" bg="rgba(26,42,58,0.6)"
+                          accent="#9b6cf5" bg="rgba(26,42,58,0.6)"
                           delay={0.2 + vi * 0.05} />
                         <ScenarioCard title="⚠️ Worst Case"
                           data={result.scenarios[vendor].worst}
-                          accent="#f85149" bg="rgba(58,26,26,0.6)"
+                          accent="#e5484d" bg="rgba(58,26,26,0.6)"
                           delay={0.3 + vi * 0.05} />
                       </div>
                     </div>
@@ -552,19 +552,19 @@ function DashboardContent() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="rounded-2xl border border-dashed py-16 text-center"
-            style={{ borderColor: '#30363d' }}
+            style={{ borderColor: '#e6d8f6' }}
           >
             <p className="text-4xl mb-3">🏛️</p>
-            <p className="font-semibold" style={{ color: '#8b949e' }}>
+            <p className="font-semibold" style={{ color: '#8a7ca0' }}>
               Configure your requirements above and click{' '}
-              <span style={{ color: '#58a6ff' }}>Run Society Simulation</span> to begin.
+              <span style={{ color: '#9b6cf5' }}>Run Society Simulation</span> to begin.
             </p>
           </motion.div>
         )}
       </div>
 
       <footer className="border-t mt-16 py-6 text-center text-xs"
-        style={{ borderColor: '#21262d', color: '#484f58' }}>
+        style={{ borderColor: '#f3ecfb', color: '#8a7ca0' }}>
         AI Purchasing Society · Hackathon Demo · Next.js 16 + FastAPI
       </footer>
     </main>
@@ -574,8 +574,8 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <Suspense fallback={
-      <main className="min-h-screen flex items-center justify-center" style={{ background: '#0d1117' }}>
-        <p style={{ color: '#8b949e' }}>Loading…</p>
+      <main className="min-h-screen flex items-center justify-center" style={{ background: '#f4eefb' }}>
+        <p style={{ color: '#8a7ca0' }}>Loading…</p>
       </main>
     }>
       <DashboardContent />

@@ -89,7 +89,7 @@ function recompute(sc: Scorecard, canon: Canon, weights: Record<Persona, number>
   return Math.min(100, Math.round((matrixScore + personaBonus) * 100))
 }
 
-const scoreColor = (s: number) => (s >= 60 ? '#3fb950' : s >= 35 ? '#d29922' : '#f85149')
+const scoreColor = (s: number) => (s >= 60 ? '#1f9d57' : s >= 35 ? '#eab308' : '#e5484d')
 
 // ── Small UI atoms ───────────────────────────────────────────────────────────────
 function WeightSlider({ label, sub, value, onChange }: {
@@ -98,29 +98,29 @@ function WeightSlider({ label, sub, value, onChange }: {
   return (
     <div>
       <div className="flex justify-between items-baseline mb-1">
-        <span className="text-xs font-semibold" style={{ color: '#e6edf3' }}>
-          {label} <span className="font-normal" style={{ color: '#6b7280' }}>· {sub}</span>
+        <span className="text-xs font-semibold" style={{ color: '#2b1d3f' }}>
+          {label} <span className="font-normal" style={{ color: '#6f6385' }}>· {sub}</span>
         </span>
-        <span className="text-xs font-bold" style={{ color: '#818cf8' }}>{value}%</span>
+        <span className="text-xs font-bold" style={{ color: '#b794f6' }}>{value}%</span>
       </div>
       <input type="range" min={0} max={100} value={value}
         onChange={e => onChange(Number(e.target.value))}
         className="w-full h-1.5 rounded-full cursor-pointer"
-        style={{ accentColor: '#818cf8', background: '#21262d' }} />
+        style={{ accentColor: '#b794f6', background: '#f3ecfb' }} />
     </div>
   )
 }
 
 function DeltaBadge({ delta }: { delta: number }) {
   if (delta === 0) return (
-    <span className="inline-flex items-center gap-0.5 text-[11px]" style={{ color: '#8b949e' }}>
+    <span className="inline-flex items-center gap-0.5 text-[11px]" style={{ color: '#8a7ca0' }}>
       <Minus className="w-3 h-3" /> 0
     </span>
   )
   const up = delta > 0
   return (
     <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold"
-      style={{ color: up ? '#3fb950' : '#f85149' }}>
+      style={{ color: up ? '#1f9d57' : '#e5484d' }}>
       {up ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}{Math.abs(delta)}
     </span>
   )
@@ -155,24 +155,24 @@ export default function InteractiveSummaryPanel({
 
   return (
     <div>
-      <h3 className="font-bold text-lg mb-1 flex items-center gap-2" style={{ color: '#e6edf3' }}>
-        <SlidersHorizontal className="w-5 h-5" style={{ color: '#a371f7' }} />
+      <h3 className="font-bold text-lg mb-1 flex items-center gap-2" style={{ color: '#2b1d3f' }}>
+        <SlidersHorizontal className="w-5 h-5" style={{ color: '#a855f7' }} />
         What-If Sensitivity Simulator
       </h3>
-      <p className="text-xs mb-4" style={{ color: '#8b949e' }}>
+      <p className="text-xs mb-4" style={{ color: '#8a7ca0' }}>
         Re-weight the board&rsquo;s priorities and tighten constraints to stress-test the decision —
         scores and flags update instantly, no re-run of the AI debate.
       </p>
 
       {/* Controls */}
-      <div className="rounded-xl border p-5 mb-5" style={{ background: '#161b22', borderColor: '#30363d' }}>
+      <div className="rounded-xl border p-5 mb-5" style={{ background: '#ffffff', borderColor: '#e6d8f6' }}>
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#8b949e' }}>
+          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#8a7ca0' }}>
             Board priority weights
           </span>
           <button onClick={reset} disabled={!dirty}
             className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg disabled:opacity-40"
-            style={{ background: '#21262d', color: '#c9d1d9' }}>
+            style={{ background: '#f3ecfb', color: '#4a3a5e' }}>
             <RotateCcw className="w-3 h-3" /> Reset
           </button>
         </div>
@@ -185,20 +185,20 @@ export default function InteractiveSummaryPanel({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 pt-4"
-          style={{ borderTop: '1px solid #21262d' }}>
+          style={{ borderTop: '1px solid #f3ecfb' }}>
           {/* Requirement pass bar */}
           <div>
             <div className="flex justify-between items-baseline mb-1">
-              <span className="text-xs font-semibold" style={{ color: '#e6edf3' }}>
+              <span className="text-xs font-semibold" style={{ color: '#2b1d3f' }}>
                 Minimum requirement bar
               </span>
-              <span className="text-xs font-bold" style={{ color: '#818cf8' }}>{threshold}%</span>
+              <span className="text-xs font-bold" style={{ color: '#b794f6' }}>{threshold}%</span>
             </div>
             <input type="range" min={0} max={100} value={threshold}
               onChange={e => setThreshold(Number(e.target.value))}
               className="w-full h-1.5 rounded-full cursor-pointer"
-              style={{ accentColor: '#818cf8', background: '#21262d' }} />
-            <p className="text-[10px] mt-1" style={{ color: '#6b7280' }}>
+              style={{ accentColor: '#b794f6', background: '#f3ecfb' }} />
+            <p className="text-[10px] mt-1" style={{ color: '#6f6385' }}>
               Criteria scoring below this are flagged as warnings.
             </p>
           </div>
@@ -206,16 +206,16 @@ export default function InteractiveSummaryPanel({
           {/* Hard constraint toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-xs font-semibold block" style={{ color: '#e6edf3' }}>
+              <span className="text-xs font-semibold block" style={{ color: '#2b1d3f' }}>
                 Enforce hard constraints
               </span>
-              <span className="text-[10px]" style={{ color: '#6b7280' }}>
+              <span className="text-[10px]" style={{ color: '#6f6385' }}>
                 Heavily penalise vendors that fail a must-have.
               </span>
             </div>
             <button onClick={() => setEnforceHard(v => !v)}
               className="relative w-11 h-6 rounded-full shrink-0 transition-colors"
-              style={{ background: enforceHard ? '#4f46e5' : '#30363d' }}>
+              style={{ background: enforceHard ? '#7c3aed' : '#e6d8f6' }}>
               <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
                 style={{ left: enforceHard ? '22px' : '2px' }} />
             </button>
@@ -226,10 +226,10 @@ export default function InteractiveSummaryPanel({
       {/* Live re-ranking notice */}
       {dirty && liveWinner && liveWinner !== winner && (
         <div className="rounded-lg px-4 py-2.5 mb-4 flex items-center gap-2 text-sm"
-          style={{ background: 'rgba(210,153,34,.12)', border: '1px solid rgba(210,153,34,.4)', color: '#e6edf3' }}>
-          <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: '#d29922' }} />
+          style={{ background: 'rgba(210,153,34,.12)', border: '1px solid rgba(210,153,34,.4)', color: '#2b1d3f' }}>
+          <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: '#eab308' }} />
           With these priorities, <b className="mx-1">{liveWinner}</b> overtakes the board&rsquo;s pick
-          (<span style={{ color: '#8b949e' }}>{winner}</span>).
+          (<span style={{ color: '#8a7ca0' }}>{winner}</span>).
         </div>
       )}
 
@@ -239,23 +239,23 @@ export default function InteractiveSummaryPanel({
           const isTop = i === 0
           return (
             <div key={sc.vendor_name} className="rounded-xl border p-5"
-              style={{ background: '#161b22', borderColor: isTop ? '#3fb950' : '#30363d' }}>
+              style={{ background: '#ffffff', borderColor: isTop ? '#1f9d57' : '#e6d8f6' }}>
               {/* Header */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  {isTop && <Trophy className="w-4 h-4 shrink-0" style={{ color: '#d29922' }} />}
-                  <span className="font-bold text-sm truncate" style={{ color: '#e6edf3' }}>{sc.vendor_name}</span>
+                  {isTop && <Trophy className="w-4 h-4 shrink-0" style={{ color: '#eab308' }} />}
+                  <span className="font-bold text-sm truncate" style={{ color: '#2b1d3f' }}>{sc.vendor_name}</span>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-2xl font-black leading-none" style={{ color: scoreColor(score) }}>
-                    {score}<span className="text-xs font-normal" style={{ color: '#8b949e' }}>/100</span>
+                    {score}<span className="text-xs font-normal" style={{ color: '#8a7ca0' }}>/100</span>
                   </div>
                   <DeltaBadge delta={delta} />
                 </div>
               </div>
 
               {/* Score bar */}
-              <div className="h-2 rounded-full mb-3" style={{ background: '#21262d' }}>
+              <div className="h-2 rounded-full mb-3" style={{ background: '#f3ecfb' }}>
                 <div className="h-full rounded-full transition-all duration-300"
                   style={{ width: `${score}%`, background: scoreColor(score) }} />
               </div>
@@ -263,8 +263,8 @@ export default function InteractiveSummaryPanel({
               {/* Hard constraint */}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-3"
                 style={{
-                  background: sc.hard_constraints_passed ? '#1f4a2a' : '#4a1f1f',
-                  color: sc.hard_constraints_passed ? '#3fb950' : '#f85149',
+                  background: sc.hard_constraints_passed ? '#dcf3e4' : '#fadddd',
+                  color: sc.hard_constraints_passed ? '#1f9d57' : '#e5484d',
                 }}>
                 {sc.hard_constraints_passed ? <ShieldCheck className="w-3 h-3" /> : <ShieldAlert className="w-3 h-3" />}
                 {sc.hard_constraints_passed ? 'Hard constraints passed' : 'Hard constraint failed'}
@@ -277,13 +277,13 @@ export default function InteractiveSummaryPanel({
                   return (
                     <li key={idx} className="flex items-start gap-2 text-xs" title={m.evidence}>
                       {pass
-                        ? <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#3fb950' }} />
-                        : <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#d29922' }} />}
-                      <span className="flex-1" style={{ color: pass ? '#c9d1d9' : '#e6edf3' }}>
+                        ? <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#1f9d57' }} />
+                        : <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#eab308' }} />}
+                      <span className="flex-1" style={{ color: pass ? '#4a3a5e' : '#2b1d3f' }}>
                         {m.criterion}
-                        {m.is_mandatory && <span title="mandatory" style={{ color: '#f85149' }}> *</span>}
+                        {m.is_mandatory && <span title="mandatory" style={{ color: '#e5484d' }}> *</span>}
                       </span>
-                      <span className="font-bold shrink-0" style={{ color: pass ? '#3fb950' : '#d29922' }}>
+                      <span className="font-bold shrink-0" style={{ color: pass ? '#1f9d57' : '#eab308' }}>
                         {m.score.toFixed(1)}
                       </span>
                     </li>
@@ -293,14 +293,14 @@ export default function InteractiveSummaryPanel({
 
               {/* Analytical bullets */}
               {sc.analytical_summary?.primary_growth_driver && (
-                <p className="flex items-start gap-1.5 text-xs mb-1" style={{ color: '#8b949e' }}>
-                  <TrendingUp className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#3fb950' }} />
+                <p className="flex items-start gap-1.5 text-xs mb-1" style={{ color: '#8a7ca0' }}>
+                  <TrendingUp className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#1f9d57' }} />
                   {sc.analytical_summary.primary_growth_driver}
                 </p>
               )}
               {sc.analytical_summary?.primary_risk_factor && (
-                <p className="flex items-start gap-1.5 text-xs" style={{ color: '#8b949e' }}>
-                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#f85149' }} />
+                <p className="flex items-start gap-1.5 text-xs" style={{ color: '#8a7ca0' }}>
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#e5484d' }} />
                   {sc.analytical_summary.primary_risk_factor}
                 </p>
               )}
@@ -309,7 +309,7 @@ export default function InteractiveSummaryPanel({
         })}
       </div>
 
-      <p className="text-[11px] mt-3" style={{ color: '#6b7280' }}>
+      <p className="text-[11px] mt-3" style={{ color: '#6f6385' }}>
         * mandatory (hard) constraint · scores re-weighted locally from the existing analysis
       </p>
     </div>

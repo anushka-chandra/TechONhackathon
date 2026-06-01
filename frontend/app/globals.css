@@ -1,41 +1,41 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-blue: #58a6ff;
-  --color-brand-green: #3fb950;
-  --color-brand-red: #f85149;
-  --color-brand-yellow: #d29922;
-  --color-surface-0: #0d1117;
-  --color-surface-1: #161b22;
-  --color-surface-2: #21262d;
-  --color-surface-3: #30363d;
-  --color-text-primary: #e6edf3;
-  --color-text-muted: #8b949e;
+  --color-brand-blue: #9b6cf5;
+  --color-brand-green: #1f9d57;
+  --color-brand-red: #e5484d;
+  --color-brand-yellow: #eab308;
+  --color-surface-0: #f4eefb;
+  --color-surface-1: #ffffff;
+  --color-surface-2: #f3ecfb;
+  --color-surface-3: #e6d8f6;
+  --color-text-primary: #2b1d3f;
+  --color-text-muted: #8a7ca0;
 }
 
 :root {
-  --background: #050505;
-  --foreground: #ffffff;
+  --background: #faf7fe;
+  --foreground: #2b1d3f;
 
   /* App-shell theme tokens (flip with html.light).
      Navbar shares the app background so the toolbar + page are one surface. */
-  --app-bg: #050505;
-  --nav-bg: #050505;
-  --nav-border: #21262d;
-  --text: #e6edf3;
-  --text-dim: #8b949e;
-  --panel: #161b22;
-  --panel-border: #30363d;
+  --app-bg: #faf7fe;
+  --nav-bg: #faf7fe;
+  --nav-border: #f3ecfb;
+  --text: #2b1d3f;
+  --text-dim: #8a7ca0;
+  --panel: #ffffff;
+  --panel-border: #e6d8f6;
 }
 
 html.light {
-  --app-bg: #f6f8fa;
-  --nav-bg: #f6f8fa;
-  --nav-border: #d0d7de;
-  --text: #1f2328;
-  --text-dim: #57606a;
+  --app-bg: #faf7fe;
+  --nav-bg: #faf7fe;
+  --nav-border: #e6d8f6;
+  --text: #2b1d3f;
+  --text-dim: #6f6385;
   --panel: #ffffff;
-  --panel-border: #d0d7de;
+  --panel-border: #e6d8f6;
 }
 
 /* The shell (navbar + Projects/Settings) follows the theme;
@@ -49,14 +49,20 @@ html, body {
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), 'Inter', var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Heading type — modern geometric pairing (Sora) for strong, premium hierarchy */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sora), var(--font-geist-sans), 'Inter', sans-serif;
+  letter-spacing: -0.01em;
 }
 
 /* ── Dashboard utility ──────────────────────────────────────────────── */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(88, 166, 255, 0.3); }
-  50%       { box-shadow: 0 0 20px rgba(88, 166, 255, 0.7); }
+  0%, 100% { box-shadow: 0 0 8px rgba(168, 85, 247, 0.3); }
+  50%       { box-shadow: 0 0 20px rgba(168, 85, 247, 0.7); }
 }
 .glow-pulse { animation: pulse-glow 2.4s ease-in-out infinite; }
 
@@ -65,7 +71,7 @@ body {
   to   { background-position:  400px 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%);
+  background: linear-gradient(90deg, #f3ecfb 25%, #e6d8f6 50%, #f3ecfb 75%);
   background-size: 800px 100%;
   animation: shimmer-load 1.5s infinite linear;
 }
@@ -77,9 +83,8 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 15% 50%, rgba(79,70,229,.15), transparent 50%),
-    radial-gradient(circle at 85% 30%, rgba(147,51,234,.15), transparent 50%),
-    radial-gradient(circle at 50% 80%, rgba(56,189,248,.10), transparent 50%);
+    radial-gradient(circle at 18% 40%, rgba(168,85,247,.06), transparent 55%),
+    radial-gradient(circle at 88% 28%, rgba(147,51,234,.05), transparent 55%);
   pointer-events: none;
 }
 
@@ -92,7 +97,7 @@ body {
   border-radius: 50%;
   background: linear-gradient(
     135deg,
-    rgba(238,130,238,.9) 0%,
+    rgba(216,140,255,.9) 0%,
     rgba(147,51,234,.9)  25%,
     rgba(59,130,246,.9)  50%,
     rgba(14,165,233,.9)  75%,
@@ -113,7 +118,7 @@ body {
 
 .intro-bubble:hover {
   box-shadow:
-    0 0 80px rgba(238,130,238,.6),
+    0 0 80px rgba(216,140,255,.6),
     0 0 120px rgba(45,212,191,.5),
     inset 0 0 50px rgba(255,255,255,.9);
 }
@@ -123,7 +128,7 @@ body {
   position: absolute;
   inset: -15%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,255,255,.2), transparent 70%);
+  background: radial-gradient(circle, rgba(124,58,237,.2), transparent 70%);
   animation: pulse-ring 3s cubic-bezier(.4,0,.2,1) infinite;
 }
 
@@ -170,8 +175,8 @@ body {
 @keyframes orbit-spin     { from { transform: rotate(0deg);   } to { transform: rotate(360deg); } }
 @keyframes orbit-spin-rev { from { transform: rotate(360deg); } to { transform: rotate(0deg);   } }
 @keyframes core-glow {
-  0%, 100% { box-shadow: 0 0 55px rgba(99,102,241,.5),  inset 0 0 28px rgba(255,255,255,.14); }
-  50%       { box-shadow: 0 0 110px rgba(99,102,241,.9), inset 0 0 44px rgba(255,255,255,.26); }
+  0%, 100% { box-shadow: 0 6px 26px rgba(168,85,247,.18), inset 0 0 26px rgba(255,255,255,.18); }
+  50%       { box-shadow: 0 6px 40px rgba(168,85,247,.30), inset 0 0 34px rgba(255,255,255,.24); }
 }
 @keyframes node-twinkle {
   0%, 100% { opacity: .35; }
@@ -189,35 +194,49 @@ body {
   background: rgba(0,0,0,.3);
   padding: 8px 24px;
   border-radius: 9999px;
-  border: 1px solid rgba(255,255,255,.2);
+  border: 1px solid rgba(124,58,237,.2);
   backdrop-filter: blur(4px);
   animation: bounce-subtle 2s infinite ease-in-out;
 }
 
 /* Glassmorphism panels */
 .glass-panel {
-  background: rgba(25,25,30,.6);
+  background: rgba(255,255,255,.6);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid rgba(124,58,237,.08);
 }
 
 /* Input */
 .input-glass {
-  background: rgba(30,30,35,.7);
-  border: 1px solid rgba(255,255,255,.10);
+  background: #faf8fe;
+  border: 1px solid rgba(124,58,237,.22);
   transition: border-color .3s, box-shadow .3s;
 }
 .input-glass:focus-within {
-  border-color: rgba(255,255,255,.3);
-  box-shadow: 0 0 0 4px rgba(255,255,255,.05);
+  border-color: rgba(124,58,237,.5);
+  box-shadow: 0 0 0 4px rgba(124,58,237,.1);
+}
+
+/* Softer, lighter placeholder text across form fields */
+input::placeholder,
+textarea::placeholder {
+  color: #a99cbb;
+  opacity: 1;
+}
+
+/* Elegant focus state for native selects */
+select:hover { border-color: rgba(124,58,237,.4); }
+select:focus-visible {
+  border-color: rgba(124,58,237,.5);
+  box-shadow: 0 0 0 4px rgba(124,58,237,.1);
 }
 
 /* Agent card selection */
 .agent-card.selected {
-  background: rgba(79,70,229,.15);
-  border-color: rgba(99,102,241,.6);
-  box-shadow: 0 0 15px rgba(99,102,241,.2);
+  background: rgba(168,85,247,.15);
+  border-color: rgba(168,85,247,.6);
+  box-shadow: 0 0 15px rgba(168,85,247,.2);
 }
 
 /* Agent panel — centered modal, transitions handled inline */
@@ -231,8 +250,8 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.2); }
+::-webkit-scrollbar-thumb { background: rgba(124,58,237,.14); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,.2); }
 
 /* Step containers */
 .step-container {
@@ -243,6 +262,11 @@ body {
   width: 100%;
   max-width: 48rem;
   text-align: center;
+  /* Scroll fix: when a step's content is taller than the viewport (e.g. Step 3
+     after an AI Web Search adds vendors), bound its height to the available area
+     and scroll internally instead of clipping behind the overflow-hidden main. */
+  max-height: calc(100vh - 3.5rem);
+  overflow-y: auto;
   transition: opacity .6s cubic-bezier(.4,0,.2,1), transform .6s cubic-bezier(.4,0,.2,1);
 }
 .step-hidden {
@@ -262,7 +286,7 @@ body {
 }
 .action-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  box-shadow: 0 16px 34px rgba(124,58,237,.16);
 }
 
 /* ── Debate page ──────────────────────────────────────────────────────────── */
@@ -276,7 +300,7 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 9999px;
-  background: #8b949e;
+  background: #8a7ca0;
   display: inline-block;
   animation: typing-bounce 1.2s infinite ease-in-out;
 }
@@ -292,25 +316,46 @@ body {
 
 /* ── Print-to-PDF: decision report ────────────────────────────────────────── */
 @media print {
-  /* Let the document grow to full height instead of one viewport page */
+  /* Undo the app shell's flex/viewport layout so the document grows to content
+     height instead of reserving full viewport pages. (`display:block` is key —
+     the body is a flex column whose flex-1 child otherwise reserves a viewport.) */
   html, body {
-    height: auto !important;
-    overflow: visible !important;
-    background: #ffffff !important;
-  }
-  body * { visibility: hidden !important; }
-
-  /* Neutralise the fixed/scrolling overlay so the report flows across pages */
-  .report-overlay,
-  .report-scroll {
-    position: static !important;
-    overflow: visible !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
-    display: block !important;
-    padding: 0 !important;
+    overflow: visible !important;
     margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    display: block !important;
+  }
+  body * { visibility: hidden !important; }
+
+  /* Hide everything that isn't the report. `visibility:hidden` alone keeps each
+     box's LAYOUT SPACE — those empty boxes (navbar, debate top bar, the tall
+     context/decision/transcript) were paginating as blank pages BEFORE the report.
+     `display:none` removes them from layout entirely. */
+  body > header,
+  .no-print,
+  main > *:not(.report-overlay) { display: none !important; }
+
+  /* Fully unwrap every ancestor between <body> and the report so none of them
+     reserves a page (the flex-1 content wrapper, <main>, and the report's own
+     fixed/scrolling overlay). */
+  body > div,
+  main,
+  .report-overlay,
+  .report-scroll {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    flex: none !important;
     background: #ffffff !important;
   }
 
