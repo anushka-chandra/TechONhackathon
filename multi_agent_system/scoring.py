@@ -244,39 +244,38 @@ def _bucket_criterion(raw: str) -> str:
     """
     Map criterion names to canonical buckets so that semantically identical
     requirements from different vendor scorecards merge into one matrix row.
-    Strips noise then checks for known concept keywords.
+    Uses word-boundary matching so a keyword only fires as a whole word (e.g.
+    'board' matches "task boards" but not "onboarding").
     """
     import re
-    s = re.sub(r'[^a-z0-9]', '', raw.lower())
-    # Budget — any mention of budget/cost/price/spend
-    if any(k in s for k in ('budget', 'cost', 'price', 'spend')):
+    # For bucketing, use a spaced version (replace non-alpha with spaces)
+    # so word-boundary matching works correctly
+    spaced = re.sub(r'[^a-z0-9]', ' ', raw.lower()).strip()
+
+    def has(words):
+        return any(re.search(r'\b' + w + r'\b', spaced) for w in words)
+
+    if has(['budget', 'cost', 'price', 'spend']):
         return 'budget'
-    # Team size — any mention of team/user/people/seats/capacity
-    if any(k in s for k in ('team', 'user', 'people', 'seat', 'capacity', 'member')):
+    if has(['team', 'user', 'people', 'seat', 'capacity', 'member']):
         return 'teamsize'
-    # Task boards
-    if any(k in s for k in ('task', 'board', 'kanban', 'card')):
+    if has(['task', 'board', 'kanban', 'card']):
         return 'taskboards'
-    # File sharing
-    if any(k in s for k in ('file', 'sharing', 'attachment', 'document', 'storage')):
+    if has(['file', 'sharing', 'attachment', 'document', 'storage']):
         return 'filesharing'
-    # Slack integration
-    if any(k in s for k in ('slack',)):
+    if has(['slack']):
         return 'slackintegration'
-    # EU hosting
-    if any(k in s for k in ('eu', 'europe', 'host', 'datacenter', 'gdpr', 'residency')):
+    if has(['eu', 'europe', 'host', 'datacenter', 'gdpr', 'residency']):
         return 'euhosting'
-    # Mobile app
-    if any(k in s for k in ('mobile', 'ios', 'android')):
+    if has(['mobile', 'ios', 'android']):
         return 'mobileapp'
-    # SSO / auth
-    if any(k in s for k in ('sso', 'auth', 'saml', 'oauth', 'signin', 'login')):
+    if has(['sso', 'auth', 'saml', 'oauth', 'signin', 'login']):
         return 'sso'
-    # Security / compliance
-    if any(k in s for k in ('security', 'compliance', 'cert', 'soc', 'iso', 'audit')):
+    if has(['security', 'compliance', 'cert', 'soc', 'iso', 'audit']):
         return 'security'
-    # Fall back to the alphanumeric stripped version
-    return s
+
+    # Fall through to alphanumeric stripped version
+    return re.sub(r'[^a-z0-9]', '', raw.lower())
 
 
 def build_decision_matrix(scorecards: List[dict]) -> dict:
