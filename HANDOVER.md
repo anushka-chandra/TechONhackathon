@@ -253,7 +253,9 @@ Shared helpers in `server.py`: `_build_brief`, `_session_vendor_text`, `_resolve
   + cost-sensitivity) → **DecisionMatrix** (static) → pros/cons → **InteractiveSummaryPanel**
   (What-If). Also: print-to-PDF report overlay (`#decision-report`, includes a print-variant
   DecisionMatrix) and the negotiation modal. (The old "Motion before the board" banner was removed.)
-  Reads `data.decision_matrix` / `data.scorecards` from the debate response.
+  Reads `data.decision_matrix` / `data.scorecards` from the debate response. The action row under the
+  Summary has THREE buttons: "Download Decision Report", "Draft negotiation emails", and **"📞 Initiate
+  Voice Negotiations"** (Vapi live WebRTC call — see Hooks below).
 - `app/dashboard/page.tsx` — older simulator view (still reachable, not in main flow).
 - `app/projects/page.tsx`, `app/settings/page.tsx` — from the navbar.
 
@@ -266,8 +268,20 @@ state), `DecisionMatrix.tsx` (STATIC, non-interactive normalized matrix; `varian
 longer imported).
 
 **Contexts**: `ChatContext` (saved analyses in localStorage), `ThemeContext` (dark/light + language,
-toggles `html.light`), `ProfileContext` (company info in localStorage). All wrap the app in
-`app/layout.tsx`.
+toggles `html.light`), `ProfileContext` (company info in localStorage — `useProfile()` → `profile.company`).
+All wrap the app in `app/layout.tsx`.
+
+**Hooks**: `hooks/useVapiNegotiator.ts` — wraps the **Vapi WebRTC voice negotiator** (`@vapi-ai/web`,
+lazy-loaded client-side only). Returns `{ callActive, loading, startNegotiation, stopNegotiation }`.
+`startNegotiation(vendor, budget, duration, company)` starts a live call where the AI agent ("Sarah")
+negotiates pricing — seeds `firstMessage` + `assistantOverrides.variableValues`. Used by the debate
+page's "Initiate Voice Negotiations" button: vendor = `decision.winner` (or "the vendor" when NONE),
+company = `profile?.company || 'our organization'`, budget/duration currently **hardcoded**
+(`'€350/month'` / `'12 months'` — TODO: drive from requirements). NOTE the page already has a `loading`
+state, so the hook's `loading` is destructured as `vapiLoading` there. Config: `NEXT_PUBLIC_VAPI_PUBLIC_KEY`
++ `NEXT_PUBLIC_VAPI_ASSISTANT_ID` in `frontend/.env.local` (gitignored via `frontend/.gitignore` `.env*`).
+The assistant id is committed in code/handover; the **public key must be filled into `.env.local`** and
+the dev server restarted (`NEXT_PUBLIC_*` is read at build/dev-start only).
 
 **Styling**: dark palette `#050505`/`#0d1117`/`#161b22`/`#30363d`, text `#e6edf3`/`#8b949e`/`#c9d1d9`,
 accents `#58a6ff`/`#818cf8`/`#a371f7`, green `#3fb950`, red `#f85149`, amber `#d29922`. Theme CSS
@@ -308,8 +322,11 @@ Everything is committed/pushed to `main`. Most recent work (this session):
    total, and `build_decision_matrix.ranking` sorts by `(passes_hard, total)` using the SAME 70%
    formula (`_qualifies` == `_passes_hard`) so the matrix trophy/explanation agrees with the banner
    (see §6). Fixed the bug where the banner showed a feasible winner while the matrix showed that
-   vendor's hard constraint FAILED. Also: duplicate matrix rows merged via alphanumeric-stripped keys
-   (partial — different-word variants can still duplicate).
+   vendor's hard constraint FAILED. Also: duplicate matrix rows merged via `_bucket_criterion`, which
+   maps a criterion to a concept bucket (budget/teamsize/taskboards/filesharing/slackintegration/
+   euhosting/mobileapp/sso/security) using **word-boundary** keyword matching (so "task boards"→
+   taskboards but "onboarding" does NOT match 'board'); unmatched names fall through to the
+   alphanumeric-stripped form.
 4. **Scoring robustness** — `score_vendor` `max_tokens` 1100→2500 (avoid truncated-JSON fallback),
    logs `[score_vendor] fallback for <vendor>: <err>` to stderr, and `_fallback_card` now reports
    `hard_constraints_passed=False`. Plus a scope rule (`SCORING_SYSTEM_PROMPT` rule 5) — score only
@@ -317,6 +334,10 @@ Everything is committed/pushed to `main`. Most recent work (this session):
 5. **Hard-constraint pre-screen before the debate** — `_prescreen_vendors` + a 3-path
    (WORST/MIDDLE/BEST) flow in `run_debate`, incl. a single-eligible-vendor short-circuit and a
    blue/purple "pre-selected winner" banner on the debate page (full details in §6).
+6. **Vapi WebRTC voice negotiator** (frontend-only, `1742503`) — `hooks/useVapiNegotiator.ts` +
+   "Initiate Voice Negotiations" button on the debate page; "Sarah" AI calls the winning vendor live to
+   negotiate pricing. Needs the public key filled into `frontend/.env.local` (§8 Hooks). `@vapi-ai/web`
+   2.5.2 added to `frontend/package.json`.
 **OpenRouter wallet is topped up again — live AI calls work** (verified 2026-06-01, HTTP 200; §11), so
 the AI path can now be exercised end-to-end. Configurable agent personalities (`ab166d7`) and the NONE
 backend signal (`c6031e2`) are also on `main`.
@@ -350,12 +371,18 @@ When you make new changes, update this section (and the rest of this file) accor
 - **Language** setting is a stored preference only — no i18n strings are wired (UI stays English).
 - **Profile/sign-in** is localStorage only — no real auth backend.
 - **Negotiation email lookup** may hallucinate plausible addresses — UI tells the user to verify.
+- **Vapi voice negotiator** is wired but needs setup to actually dial: `NEXT_PUBLIC_VAPI_PUBLIC_KEY`
+  must be filled into `frontend/.env.local` (placeholder `FILL_IN_BY_USER` by default) and the dev
+  server restarted. Budget/duration passed to the agent are **hardcoded** (`€350/month` / `12 months`),
+  not yet derived from the actual requirements. Live calls require mic permission + a funded Vapi
+  account (telephony/usage is billed separately from OpenRouter).
 - `:online` web search adds a small per-search $ surcharge (drove the $ spend up vs token count).
 - OpenRouter: **the wallet has been topped up — live API calls work again** (verified 2026-06-01: a
   real `chat/completions` call returned HTTP 200 and billed ~$0.0000028; the earlier
   `402 Insufficient credits` failure is RESOLVED). AI features (debate/scoring/search) are live, not
-  falling back to empties. Caveats on visibility: the key (`/auth/key`) has a **$100 spend cap** with
-  **~$97.97 remaining** (key usage ~$2.03) — but that's the KEY CAP, not the wallet balance. The real
+  falling back to empties (re-verified working 2026-06-01 later in the day, HTTP 200). Caveats on
+  visibility: the key (`/auth/key`) has a **$100 spend cap** with **~$97.50 remaining** (key usage
+  ~$2.50, ~$0.48 of it today) — but that's the KEY CAP, not the wallet balance. The real
   wallet $ balance can't be read with this key (`/credits` → 403 "only management keys"); check
   https://openrouter.ai/settings/credits in the browser for the actual number. Key **expires
   2026-06-05**.
