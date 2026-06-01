@@ -407,6 +407,14 @@ When you make new changes, update this section (and the rest of this file) accor
   `body`, `body > div`, `main`, `.report-overlay`, `.report-scroll`) and `display:none`s the navbar +
   all `main > *:not(.report-overlay)`. `visibility:hidden` alone had kept those boxes' layout space →
   leading blank pages. (Browser print CSS may need a HARD refresh to reload.)
+- **Scrollbars are hidden app-wide** (globals.css: `* { scrollbar-width: none }` + `::-webkit-scrollbar
+  { display:none !important }`). The orchid theme's purple-styled scrollbar thumb kept flashing in as a
+  stray vertical line (macOS overlay scrollbar appearing when the cursor entered any `overflow:auto`
+  area — e.g. hovering the "Open Board Selection" button). Everything is still scrollable via
+  trackpad/wheel/keys; only the visible bar is gone. To bring back a subtle bar on long pages (debate),
+  re-add a styled `::-webkit-scrollbar` on a specific container instead of globally.
+- **Homepage hero**: the small "AI Purchasing Society" pill/badge above the headline was removed (the
+  whole chip, so no orphan/gap remains — headline collapses up).
 - **Language** setting is a stored preference only — no i18n strings are wired (UI stays English).
 - **Profile/sign-in** is localStorage only — no real auth backend.
 - **Negotiation email lookup** may hallucinate plausible addresses — UI tells the user to verify.

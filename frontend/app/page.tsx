@@ -527,12 +527,6 @@ export default function LandingPage() {
 
           {/* Left — copy, CTA, metrics */}
           <div className="flex-1 w-full">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm mb-6"
-              style={{ background: 'rgba(124,58,237,.05)', border: '1px solid rgba(124,58,237,.14)', color: '#9a8cae' }}>
-              <span className="w-2 h-2 rounded-full" style={{ background: '#8b5cf6' }} />
-              AI Purchasing Society
-            </div>
-
             <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05] mb-6"
               style={{ color: '#160f24' }}>
               Turn vendor noise into a<br />

@@ -247,11 +247,12 @@ select:focus-visible {
 }
 .bar-hidden { opacity: 0; transform: translateY(20px); pointer-events: none; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(124,58,237,.14); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,.2); }
+/* Scrollbar — hidden app-wide. The styled purple thumb was showing up as a stray
+   vertical line (the macOS overlay scrollbar flashing in whenever the cursor entered
+   a scroll area, e.g. hovering a button inside a `overflow:auto` container). Hiding it
+   removes the artifact everywhere; content stays fully scrollable via trackpad/wheel/keys. */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
 
 /* Step containers */
 .step-container {
@@ -267,8 +268,14 @@ select:focus-visible {
      and scroll internally instead of clipping behind the overflow-hidden main. */
   max-height: calc(100vh - 3.5rem);
   overflow-y: auto;
+  /* Hide the scrollbar — its (purple) macOS overlay thumb flashed in as a thin
+     vertical line whenever the mouse entered the step area (e.g. hovering a button).
+     Content stays fully scrollable via trackpad/wheel; only the visible bar is gone. */
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* legacy Edge */
   transition: opacity .6s cubic-bezier(.4,0,.2,1), transform .6s cubic-bezier(.4,0,.2,1);
 }
+.step-container::-webkit-scrollbar { display: none; }   /* WebKit (Chrome/Safari) */
 .step-hidden {
   opacity: 0;
   transform: translate(-50%, -40%);
